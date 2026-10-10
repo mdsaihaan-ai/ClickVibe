@@ -18,7 +18,50 @@
 @media(min-width:680px){.main{padding:25px}.hero{padding:29px 28px}.hero h1{font-size:45px}.app{padding-bottom:24px}.bottom{position:static;max-width:760px;margin:0 auto 20px;border:1px solid #293440;border-radius:15px}.fab{bottom:90px}}
 @media(max-width:360px){.main{padding:14px 12px}.hero{padding:20px 16px}.hero h1{font-size:29px}.stat{padding:11px 9px}.stat b{font-size:20px}.card{padding:13px}.top{padding:12px}}
 </style></head>
-<body><div class="app">
+<body>
+<div id="authView" class="hidden">
+    <div class="auth-card">
+        <h1>Welcome to <span class="gold">ClickVibe</span></h1>
+        <p>Ideas into ventures. Ventures into evidence.</p>
+
+        <button class="btn primary" onclick="showLogin('user')">
+            User Login
+        </button>
+
+        <button class="btn" onclick="showLogin('dev')">
+            Dev Login
+        </button>
+
+        <div id="loginForm" class="hidden">
+            <div class="field">
+                <label>Email</label>
+                <input id="loginEmail" type="email" autocomplete="email"
+                       placeholder="you@example.com">
+            </div>
+
+            <div class="field">
+                <label>Password</label>
+                <input id="loginPassword" type="password"
+                       autocomplete="current-password" placeholder="Password">
+            </div>
+
+            <button class="btn primary" onclick="signInWithEmail()">
+                Sign in
+            </button>
+
+            <button class="btn" onclick="signInWithGoogle()">
+                Continue with Google
+            </button>
+
+            <button class="btn" onclick="showSignup()">
+                Create account
+            </button>
+
+            <p id="authMessage" role="status"></p>
+        </div>
+    </div>
+</div>
+<div class="app">
     <header class="top">
         <div class="mark">
             <img src="ClickVibeLOGO.jpeg" alt="ClickVibe logo">
