@@ -346,6 +346,8 @@ async function signInWithEmail() {
 }
 
 async function cvFinishLogin(user) {
+  const client = window.clickVibeSupabase;
+
   document.getElementById("authView").classList.add("hidden");
   document.querySelector(".app").classList.remove("hidden");
 
@@ -360,9 +362,36 @@ async function cvFinishLogin(user) {
     profileName.value = name;
   }
 
-  if (typeof toast === "function") {
-    toast("Signed in successfully.");
+  const displayName = document.getElementById("accountDisplayName");
+  if (displayName) {
+    displayName.textContent = name;
   }
+
+  const emailElement = document.getElementById("accountEmail");
+  if (emailElement) {
+    emailElement.textContent = user.email || "Email unavailable";
+  }
+
+  const roleElement = document.getElementById("accountRole");
+
+  if (roleElement) {
+    roleElement.textContent = "Verifying role…";
+
+    try {
+      const { data: isAdmin, error } = await client.rpc("is_admin");
+
+      if (error) {
+        throw error;
+      }
+
+      roleElement.textContent = isAdmin === true ? "Developer" : "Member";
+    } catch (error) {
+      console.error("ClickVibe: Role verification failed", error);
+      roleElement.textContent = "Role unverified";
+    }
+  }
+
+  toast("Signed in successfully.");
 }
 
 async function signInWithGoogle() {
