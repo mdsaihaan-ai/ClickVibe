@@ -395,10 +395,84 @@ async function cvFinishLogin(user) {
 }
 
 async function signInWithGoogle() {
-  cvAuthMessage(
-    "Google sign-in needs the Android redirect configuration before it can be enabled."
-  );
+  const client = window.clickVibeSupabase;
+
+  if (!client) {
+    cvAuthMessage("Authentication is unavailable.");
+    return;
+  }
+
+  if (!window.ClickVibeAndroid) {
+    cvAuthMessage("Android sign-in bridge is unavailable.");
+    return;
+  }
+
+  cvAuthMessage("Opening Google sign-in…");
+
+  try {
+    const { data, error } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "clickvibe://login-callback",
+        skipBrowserRedirect: true
+      }
+    });
+
+    if (error) throw error;
+
+    if (!data.url) {
+      throw new Error("Google authorization URL was not returned.");
+    }
+
+    window.ClickVibeAndroid.openOAuth(data.url);
+
+  } catch (error) {
+    console.error("ClickVibe Google sign-in:", error);
+    cvAuthMessage(error.message || "Google sign-in failed.");
+  }
 }
+window.handleOAuthCallback = async function (callbackUrl) {
+  const client = window.clickVibeSupabase;
+
+  if (!client) {
+    cvAuthMessage("Authentication is unavailable.");
+    return;
+  }
+
+  try {
+    const url = new URL(callbackUrl);
+    const errorMessage =
+      url.searchParams.get("error_description") ||
+      url.searchParams.get("error");
+
+    if (errorMessage) {
+      throw new Error(errorMessage);
+    }
+
+    const code = url.searchParams.get("code");
+
+    if (!code) {
+      throw new Error("Google sign-in returned no authorization code.");
+    }
+
+    cvAuthMessage("Completing Google sign-in…");
+
+    const { data, error } =
+      await client.auth.exchangeCodeForSession(code);
+
+    if (error) throw error;
+
+    if (!data.session) {
+      throw new Error("No authenticated session was returned.");
+    }
+
+    await cvFinishLogin(data.session.user);
+
+  } catch (error) {
+    console.error("ClickVibe OAuth callback:", error);
+    cvAuthMessage(error.message || "Google sign-in could not be completed.");
+  }
+};
 
 async function cvInitAuth() {
   const client = window.clickVibeSupabase;
