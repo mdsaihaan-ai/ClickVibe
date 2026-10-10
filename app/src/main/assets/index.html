@@ -128,7 +128,57 @@ overflow-wrap: anywhere;
 <section id="ideasView" class="hidden"><div class="eyebrow">Think out loud</div><div class="sectionhead"><h2>Ideas</h2><button class="btn small primary" onclick="openCreate('Idea')">＋ New idea</button></div><p class="muted">What should exist? Who needs it? How could it work?</p><div id="ideasList"></div></section>
 <section id="venturesView" class="hidden"><div class="eyebrow">Execution & evidence</div><div class="sectionhead"><h2>Ventures</h2><button class="btn small primary" onclick="openCreate('Venture')">＋ New venture</button></div><p class="muted">Follow the work, experiments and outcomes—not just the pitch.</p><div id="venturesList"></div></section>
 <section id="backingView" class="hidden"><div class="eyebrow">Capital & resources</div><div class="sectionhead"><h2>Backing board</h2></div><div class="notice">Prototype only. This board records discussion and resource needs; it does not accept money, offer securities or arrange investments.</div><div id="backingList"></div><div class="formcard"><h3 style="margin-top:0">What does your venture need?</h3><div class="field"><label>Venture name</label><input id="backName" placeholder="e.g. Local Food Guide"></div><div class="field"><label>Resource needed</label><select id="backNeed"><option>Feedback</option><option>Distribution</option><option>Equipment</option><option>Funding discussion</option><option>Skills / collaborator</option></select></div><div class="field"><label>Why it matters</label><textarea id="backWhy" placeholder="What will this resource help you test or achieve?"></textarea></div><button class="btn primary" onclick="submitBacking()">Post resource request</button></div></section>
-<section id="profileView" class="hidden"><div class="eyebrow">Your workspace</div><div class="sectionhead"><h2>Member profile</h2></div><div class="formcard"><div class="cardtop"><div class="avatar">S</div><div><div class="author">Saihaan</div><div class="muted" style="font-size:12px">ClickVibe founder · Prototype profile</div></div></div><div class="field"><label>Display name</label><input id="profileName" value="Saihaan"></div><div class="field"><label>What are you building?</label><textarea id="profileBio">Building ClickVibe and testing business ideas in public.</textarea></div><button class="btn primary" onclick="saveProfile()">Save profile</button></div><div class="sectionhead"><h2>Your activity</h2></div><div id="myActivity"></div><div class="notice">Your posts and profile are stored only on this device in this prototype. There are no accounts or shared server yet.</div></section>
+    <section id="profileView" class="hidden">
+        <div class="eyebrow">Your workspace</div>
+
+        <div class="sectionhead">
+            <h2>Member profile</h2>
+        </div>
+
+        <div class="formcard">
+            <div class="cardtop">
+                <div class="avatar">S</div>
+                <div>
+                    <div class="author" id="accountDisplayName">Saihaan</div>
+                    <div class="muted" id="accountEmail" style="font-size:12px">
+                        Checking account…
+                    </div>
+                    <div class="tag" id="accountRole" style="margin-top:8px">
+                        Checking role…
+                    </div>
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Display name</label>
+                <input id="profileName" value="Saihaan">
+            </div>
+
+            <div class="field">
+                <label>What are you building?</label>
+                <textarea id="profileBio">Building ClickVibe and testing business ideas in public.</textarea>
+            </div>
+
+            <button class="btn primary" onclick="saveProfile()">
+                Save profile
+            </button>
+
+            <button class="btn" onclick="signOutClickVibe()" style="margin-top:10px">
+                Sign out
+            </button>
+
+        </div>
+
+        <div class="sectionhead">
+            <h2>Your activity</h2>
+        </div>
+
+        <div id="myActivity"></div>
+
+        <div class="notice">
+            Your account is authenticated through ClickVibe. Profile and community content will be connected to the shared database as development continues.
+        </div>
+    </section>
 <section id="createView" class="hidden"><div class="eyebrow">Put an idea into the world</div><div class="sectionhead"><h2 id="createTitle">Create a post</h2><button class="btn small" onclick="navigate('home')">Cancel</button></div><div class="formcard"><div class="field"><label>Post type</label><select id="postType"><option>Idea</option><option>Venture</option><option>Update</option><option>Discussion</option><option>Announcement</option></select></div><div class="field"><label>Title</label><input id="postTitle" placeholder="Make the core idea clear"></div><div class="field"><label>Description</label><textarea id="postBody" placeholder="What is it, who does it serve, and how does it work?"></textarea></div><div class="row"><div class="field"><label>Status</label><select id="postStatus"><option>Idea</option><option>Testing</option><option>Active</option><option>Paused</option><option>Completed</option></select></div><div class="field"><label>Category</label><select id="postCategory"><option>Business</option><option>Marketing</option><option>Product</option><option>Experiment</option><option>Community</option></select></div></div><div class="notice">Keep it honest: distinguish what you've observed from what you're still testing.</div><button class="btn primary" style="width:100%" onclick="createPost()">Publish locally</button></div></section>
 </main><button class="fab" aria-label="Create post" onclick="openCreate()">＋</button>
 <nav class="bottom"><button class="nav active" data-view="home" onclick="navigate('home')"><span class="ico">⌂</span>Home</button><button class="nav" data-view="ideas" onclick="navigate('ideas')"><span class="ico">✳</span>Ideas</button><button class="nav" data-view="ventures" onclick="navigate('ventures')"><span class="ico">↗</span>Ventures</button><button class="nav" data-view="backing" onclick="navigate('backing')"><span class="ico">◇</span>Backing</button><button class="nav" data-view="profile" onclick="navigate('profile')"><span class="ico">◉</span>Profile</button></nav></div>
@@ -203,6 +253,30 @@ function showSignup() {
   cvAuthMessage("Create your ClickVibe account using your email.");
 }
 
+async function signOutClickVibe() {
+  const client = window.clickVibeSupabase;
+
+  if (!client) {
+    toast("Authentication is unavailable.");
+    return;
+  }
+
+  const { error } = await client.auth.signOut();
+
+  if (error) {
+    toast("Sign out failed: " + error.message);
+    return;
+  }
+
+  document.getElementById("authView").classList.remove("hidden");
+  document.querySelector(".app").classList.add("hidden");
+
+  document.getElementById("loginForm").classList.add("hidden");
+  document.getElementById("loginEmail").value = "";
+  document.getElementById("loginPassword").value = "";
+
+  toast("Signed out successfully.");
+}
 async function signInWithEmail() {
   const client = window.clickVibeSupabase;
 
