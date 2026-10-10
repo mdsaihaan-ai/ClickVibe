@@ -196,12 +196,32 @@ let posts;try{posts=JSON.parse(localStorage.getItem('cv_posts'))||seed}catch(e){
 const $=id=>document.getElementById(id);function persist(){try{localStorage.setItem('cv_posts',JSON.stringify(posts));localStorage.setItem('cv_backing',JSON.stringify(backing))}catch(e){}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function iconFor(t){return ({Idea:'✳',Venture:'↗',Update:'↻',Discussion:'☷',Announcement:'✦'})[t]||'•'}
-function card(p,compact=false){return `<article class="card"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div><div><div class="author">${esc(p.author)}</div><div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button onclick="likePost('${p.id}')">♡ ${p.likes||0} support</button><button onclick="toggleComments('${p.id}')">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="hidden">${(p.comments||[]).map(c=>`<div class="comment">${esc(c)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}')">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
+function card(p,compact=false){return `<article class="card"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div><div><div class="author">${esc(p.author)}</div><div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
+  class="${p.supportedByMe ? 'supported' : ''}"
+  onclick="likePost('${p.id}')">
+  ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
+</button><button onclick="toggleComments('${p.id}')">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="hidden">${(p.comments||[]).map(c=>`<div class="comment">${esc(c)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}')">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p></article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile')render();}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
 function createPost(){let title=$('postTitle').value.trim(),body=$('postBody').value.trim();if(!title||!body){toast('Add a title and description first.');return}let type=$('postType').value;posts.unshift({id:'p'+Date.now(),type,title,body,status:$('postStatus').value,category:$('postCategory').value,author:($('profileName').value||'Saihaan').trim(),time:'Just now',comments:[],likes:0,updateCount:0});persist();filter='All';document.querySelectorAll('#feedFilters .chip').forEach(c=>c.classList.toggle('active',c.dataset.filter==='All'));render();navigate(type==='Idea'?'ideas':type==='Venture'?'ventures':'home');toast('Published on this device.');}
-function likePost(id){const p=posts.find(p=>p.id===id);if(p){p.likes=(p.likes||0)+1;persist();render()}}
+function likePost(id) {
+  const post = posts.find(p => p.id === id);
+  if (!post) return;
+
+  post.likes = post.likes || 0;
+
+  if (post.supportedByMe) {
+    post.likes = Math.max(0, post.likes - 1);
+    post.supportedByMe = false;
+  } else {
+    post.likes += 1;
+    post.supportedByMe = true;
+  }
+
+  persist();
+  render();
+}
 function toggleComments(id){$('comments-'+id).classList.toggle('hidden')}
 function commentPost(id){const input=$('commentinput-'+id),val=input.value.trim(),p=posts.find(p=>p.id===id);if(!val||!p)return;p.comments.push(val);persist();render();$('comments-'+id)?.classList.remove('hidden');toast('Reply added locally.');}
 function submitBacking(){let name=$('backName').value.trim(),why=$('backWhy').value.trim();if(!name||!why){toast('Add the venture name and what it needs.');return}backing.unshift({name,need:$('backNeed').value,why,author:$('profileName').value||'Saihaan'});persist();$('backName').value='';$('backWhy').value='';render();toast('Resource request posted locally.');}
