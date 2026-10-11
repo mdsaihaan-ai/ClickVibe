@@ -283,6 +283,48 @@ if (commentsError) throw commentsError;
     toast('Could not load community posts. Check the connection.');
   }
 }
+function subscribeCommunityRealtime() {
+  const client = window.clickVibeSupabase;
+
+  if (!client) return;
+
+  if (window.cvCommunityChannel) {
+    client.removeChannel(window.cvCommunityChannel);
+  }
+
+  window.cvCommunityChannel = client
+    .channel('community-live-updates')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'community_posts'
+      },
+      () => loadCommunityPosts()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'community_likes'
+      },
+      () => loadCommunityPosts()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'community_comments'
+      },
+      () => loadCommunityPosts()
+    )
+    .subscribe((status) => {
+      console.log('ClickVibe Realtime:', status);
+    });
+}
 async function createPost() {
   const title = $('postTitle').value.trim();
   const body = $('postBody').value.trim();
@@ -740,7 +782,8 @@ async function cvFinishLogin(user) {
   }
 
   await loadCommunityPosts();
-  toast("Signed in successfully.");
+subscribeCommunityRealtime();
+toast("Signed in successfully.");
 }
 
 async function signInWithGoogle() {
