@@ -210,33 +210,61 @@ async function loadCommunityPosts() {
   if (!client) return;
 
   try {
-    const { data, error } = await client
+    const { data: sessionData, error: sessionError } =
+      await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    const { data: rows, error: postsError } = await client
       .from('community_posts')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (postsError) throw postsError;
 
-    posts = (data || []).map(row => ({
-      id: row.id,
-      type: row.type,
-      title: row.title,
-      body: row.body,
-      status: row.status,
-      category: row.category,
-      author: row.author_name,
-      time: new Date(row.created_at).toLocaleString(),
-      comments: [],
-      likes: 0,
-      updateCount: 0
-    }));
+    const { data: likes, error: likesError } = await client
+      .from('community_likes')
+      .select('post_id, user_id');
+
+    if (likesError) throw likesError;
+
+    posts = (rows || []).map(row => {
+      const postLikes = (likes || []).filter(
+        like => like.post_id === row.id
+      );
+
+      return {
+        id: row.id,
+        type: row.type,
+        title: row.title,
+        body: row.body,
+        status: row.status,
+        category: row.category,
+        author: row.author_name,
+        time: new Date(row.created_at).toLocaleString(),
+        comments: [],
+        likes: postLikes.length,
+        supportedByMe: !!user && postLikes.some(
+          like => like.user_id === user.id
+        ),
+        updateCount: 0
+      };
+    });
 
     render();
 
-    console.log('ClickVibe: Community posts loaded:', posts.length);
+    console.log(
+      'ClickVibe: Community posts loaded:',
+      posts.length
+    );
 
   } catch (error) {
-    console.error('ClickVibe: Could not load community posts:', error);
+    console.error(
+      'ClickVibe: Could not load community posts:',
+      error
+    );
     toast('Could not load community posts. Check the connection.');
   }
 }
