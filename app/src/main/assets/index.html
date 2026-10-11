@@ -204,6 +204,42 @@ function card(p,compact=false){return `<article class="card"><div class="cardtop
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p></article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile')render();}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
+async function loadCommunityPosts() {
+  const client = window.clickVibeSupabase;
+
+  if (!client) return;
+
+  try {
+    const { data, error } = await client
+      .from('community_posts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    posts = (data || []).map(row => ({
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      body: row.body,
+      status: row.status,
+      category: row.category,
+      author: row.author_name,
+      time: new Date(row.created_at).toLocaleString(),
+      comments: [],
+      likes: 0,
+      updateCount: 0
+    }));
+
+    render();
+
+    console.log('ClickVibe: Community posts loaded:', posts.length);
+
+  } catch (error) {
+    console.error('ClickVibe: Could not load community posts:', error);
+    toast('Could not load community posts. Check the connection.');
+  }
+}
 async function createPost() {
   const title = $('postTitle').value.trim();
   const body = $('postBody').value.trim();
@@ -510,6 +546,7 @@ async function cvFinishLogin(user) {
     }
   }
 
+  await loadCommunityPosts();
   toast("Signed in successfully.");
 }
 
