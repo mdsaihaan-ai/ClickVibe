@@ -200,7 +200,7 @@ function card(p,compact=false){return `<article class="card"><div class="cardtop
   class="${p.supportedByMe ? 'supported' : ''}"
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
-</button><button onclick="toggleComments('${p.id}')">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="hidden">${(p.comments||[]).map(c=>`<div class="comment">${esc(c)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}')">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
+</button><button onclick="toggleComments('${p.id}')">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="hidden">${(p.comments||[]).map(c=>`<div class="comment">${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}')">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p></article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile')render();}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
@@ -426,7 +426,70 @@ async function likePost(id) {
   }
 }
 function toggleComments(id){$('comments-'+id).classList.toggle('hidden')}
-function commentPost(id){const input=$('commentinput-'+id),val=input.value.trim(),p=posts.find(p=>p.id===id);if(!val||!p)return;p.comments.push(val);persist();render();$('comments-'+id)?.classList.remove('hidden');toast('Reply added locally.');}
+async function commentPost(id) {
+  const input = $('commentinput-' + id);
+  const body = input.value.trim();
+  const post = posts.find(p => p.id === id);
+  const client = window.clickVibeSupabase;
+
+  if (!body || !post) return;
+
+  if (!client) {
+    toast('Supabase is unavailable. Check your connection.');
+    return;
+  }
+
+  try {
+    const { data: sessionData, error: sessionError } =
+      await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+      toast('Please sign in to reply.');
+      return;
+    }
+
+    const authorName = (
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.email?.split('@')[0] ||
+      'Member'
+    ).trim();
+
+    const { data, error } = await client
+      .from('community_comments')
+      .insert({
+        post_id: id,
+        user_id: user.id,
+        author_name: authorName,
+        body: body
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    post.comments.push({
+      id: data.id,
+      author: data.author_name,
+      body: data.body,
+      created_at: data.created_at
+    });
+
+    input.value = '';
+    render();
+
+    $('comments-' + id)?.classList.remove('hidden');
+    toast('Reply added successfully.');
+
+  } catch (error) {
+    console.error('ClickVibe: Comment failed:', error);
+    toast('Could not add reply: ' + (error.message || 'Unknown error'));
+  }
+}
 function submitBacking(){let name=$('backName').value.trim(),why=$('backWhy').value.trim();if(!name||!why){toast('Add the venture name and what it needs.');return}backing.unshift({name,need:$('backNeed').value,why,author:$('profileName').value||'Saihaan'});persist();$('backName').value='';$('backWhy').value='';render();toast('Resource request posted locally.');}
 function saveProfile(){try{localStorage.setItem('cv_profile',JSON.stringify({name:$('profileName').value,bio:$('profileBio').value}))}catch(e){}toast('Profile saved on this device.');render()}
 let toastTimer;function toast(msg){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.remove(),2200)}
