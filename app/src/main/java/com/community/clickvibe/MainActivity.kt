@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.community.clickvibe.ui.theme.ClickVibeTheme
+import android.webkit.WebChromeClient
 
 class MainActivity : ComponentActivity() {
 
@@ -45,6 +46,8 @@ class MainActivity : ComponentActivity() {
                             setBackgroundColor(Color.rgb(9, 11, 15))
                             visibility = View.INVISIBLE
                             webView = this
+
+                            webChromeClient = WebChromeClient()
 
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
