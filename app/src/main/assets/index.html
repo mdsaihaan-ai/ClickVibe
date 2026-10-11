@@ -615,7 +615,6 @@ async function deleteComment(commentId, postId) {
   }
 }
 async function deletePost(id) {
-alert('Delete button clicked: ' + id);
   const client = window.clickVibeSupabase;
   const post = posts.find(p => p.id === id);
 
