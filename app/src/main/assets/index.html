@@ -204,7 +204,106 @@ function card(p,compact=false){return `<article class="card"><div class="cardtop
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p></article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile')render();}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
-function createPost(){let title=$('postTitle').value.trim(),body=$('postBody').value.trim();if(!title||!body){toast('Add a title and description first.');return}let type=$('postType').value;posts.unshift({id:'p'+Date.now(),type,title,body,status:$('postStatus').value,category:$('postCategory').value,author:($('profileName').value||'Saihaan').trim(),time:'Just now',comments:[],likes:0,updateCount:0});persist();filter='All';document.querySelectorAll('#feedFilters .chip').forEach(c=>c.classList.toggle('active',c.dataset.filter==='All'));render();navigate(type==='Idea'?'ideas':type==='Venture'?'ventures':'home');toast('Published on this device.');}
+async function createPost() {
+  const title = $('postTitle').value.trim();
+  const body = $('postBody').value.trim();
+
+  if (!title || !body) {
+    toast('Add a title and description first.');
+    return;
+  }
+
+  const client = window.clickVibeSupabase;
+
+  if (!client) {
+    toast('Supabase is unavailable. Check your connection.');
+    return;
+  }
+
+  try {
+    // Get the authenticated user.
+    const { data: sessionData, error: sessionError } =
+      await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+      toast('Please sign in before publishing.');
+      return;
+    }
+
+    const type = $('postType').value;
+
+    // These are the three types currently allowed by our database.
+    if (!['Idea', 'Venture', 'Update'].includes(type)) {
+      toast('This post type is not supported by the database yet.');
+      return;
+    }
+
+    const authorName = (
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.email?.split('@')[0] ||
+      'Member'
+    ).trim();
+
+    // Save the post to Supabase.
+    const { data: savedPost, error: insertError } = await client
+      .from('community_posts')
+      .insert({
+        author_id: user.id,
+        author_name: authorName,
+        type: type,
+        title: title,
+        body: body,
+        status: $('postStatus').value,
+        category: $('postCategory').value
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    // Update the interface only after the database confirms success.
+    posts.unshift({
+      id: savedPost.id,
+      type: savedPost.type,
+      title: savedPost.title,
+      body: savedPost.body,
+      status: savedPost.status,
+      category: savedPost.category,
+      author: savedPost.author_name,
+      time: 'Just now',
+      comments: [],
+      likes: 0,
+      updateCount: 0
+    });
+
+    filter = 'All';
+
+    document.querySelectorAll('#feedFilters .chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.filter === 'All');
+    });
+
+    render();
+
+    navigate(
+      type === 'Idea'
+        ? 'ideas'
+        : type === 'Venture'
+          ? 'ventures'
+          : 'home'
+    );
+
+    toast('Published successfully!');
+
+  } catch (error) {
+    console.error('ClickVibe: Post creation failed:', error);
+    toast('Could not publish: ' + (error.message || 'Unknown error'));
+  }
+}
 function likePost(id) {
   const post = posts.find(p => p.id === id);
   if (!post) return;
