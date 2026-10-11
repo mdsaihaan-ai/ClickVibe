@@ -280,7 +280,7 @@ let posts=[];let backing;try{backing=JSON.parse(localStorage.getItem('cv_backing
 const $=id=>document.getElementById(id);function persist(){try{localStorage.setItem('cv_posts',JSON.stringify(posts));localStorage.setItem('cv_backing',JSON.stringify(backing))}catch(e){}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function iconFor(t){return ({Idea:'✳',Venture:'↗',Update:'↻',Discussion:'☷',Announcement:'✦'})[t]||'•'}
-function card(p,compact=false){return `<article class="card"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div><div><div class="author">${esc(p.author)}</div><div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
+function card(p,compact=false){return `<article class="card"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div>${p.author_id && p.author_id === window.cvUserId ? `<button class="btn small" onclick="deletePost('${p.id}')">Delete</button>` : ''}<div><div class="author">${esc(p.author)}</div><div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
   class="${p.supportedByMe ? 'supported' : ''}"
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
@@ -328,6 +328,7 @@ if (commentsError) throw commentsError;
 
       return {
         id: row.id,
+        author_id: row.author_id,
         type: row.type,
         title: row.title,
         body: row.body,
@@ -611,6 +612,51 @@ async function deleteComment(commentId, postId) {
   } catch (error) {
     console.error('ClickVibe: Comment deletion failed:', error);
     toast('Could not delete comment: ' + (error.message || 'Unknown error'));
+  }
+}
+async function deletePost(id) {
+alert('Delete button clicked: ' + id);
+  const client = window.clickVibeSupabase;
+  const post = posts.find(p => p.id === id);
+
+  if (!client || !post) {
+    toast('Could not find this post.');
+    return;
+  }
+
+  const { data: sessionData, error: sessionError } = await client.auth.getSession();
+
+  if (sessionError || !sessionData?.session?.user) {
+    toast('Please sign in again.');
+    return;
+  }
+
+  const user = sessionData.session.user;
+
+  if (user.id !== post.author_id) {
+    toast('You can only delete your own posts.');
+    return;
+  }
+
+  if (!confirm('Delete this post permanently? This cannot be undone.')) {
+    return;
+  }
+
+  try {
+    const { error } = await client
+      .from('community_posts')
+      .delete()
+      .eq('id', id)
+      .eq('author_id', user.id);
+
+    if (error) throw error;
+
+    posts = posts.filter(p => p.id !== id);
+    render();
+    toast('Post deleted successfully.');
+  } catch (error) {
+    console.error('ClickVibe: Post deletion failed:', error);
+    toast('Could not delete the post. Please try again.');
   }
 }
 async function commentPost(id) {
