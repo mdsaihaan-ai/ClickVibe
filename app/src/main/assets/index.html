@@ -200,7 +200,7 @@ function card(p,compact=false){return `<article class="card"><div class="cardtop
   class="${p.supportedByMe ? 'supported' : ''}"
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
-</button><button onclick="toggleComments('${p.id}')">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `<strong>${esc(c.author || 'Member')}</strong><br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}')">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
+</button><button onclick="toggleComments('${p.id}')">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId ? ` <button class="btn small" onclick="deleteComment('${c.id}','${p.id}')">Delete</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}')">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p></article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile')render();}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
@@ -216,6 +216,7 @@ async function loadCommunityPosts() {
     if (sessionError) throw sessionError;
 
     const user = sessionData.session?.user;
+    window.cvUserId = user?.id || null;
 
     const { data: rows, error: postsError } = await client
       .from('community_posts')
@@ -440,6 +441,52 @@ async function likePost(id) {
   }
 }
 function toggleComments(id){$('comments-'+id).classList.toggle('hidden')}
+async function deleteComment(commentId, postId) {
+  const client = window.clickVibeSupabase;
+
+  if (!client) {
+    toast('Supabase is unavailable.');
+    return;
+  }
+
+  try {
+    const { data: sessionData, error: sessionError } =
+      await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+      toast('Please sign in first.');
+      return;
+    }
+
+    const { error } = await client
+      .from('community_comments')
+      .delete()
+      .eq('id', commentId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+
+    const post = posts.find(p => p.id === postId);
+
+    if (post) {
+      post.comments = post.comments.filter(
+        c => typeof c === 'string' || c.id !== commentId
+      );
+    }
+
+    render();
+    $('comments-' + postId)?.classList.remove('hidden');
+    toast('Comment deleted.');
+
+  } catch (error) {
+    console.error('ClickVibe: Comment deletion failed:', error);
+    toast('Could not delete comment: ' + (error.message || 'Unknown error'));
+  }
+}
 async function commentPost(id) {
   const input = $('commentinput-' + id);
   const body = input.value.trim();
@@ -487,11 +534,12 @@ async function commentPost(id) {
     if (error) throw error;
 
     post.comments.push({
-      id: data.id,
-      author: data.author_name,
-      body: data.body,
-      created_at: data.created_at
-    });
+  id: data.id,
+  author: data.author_name,
+  body: data.body,
+  created_at: data.created_at,
+  user_id: user.id
+});
 
     input.value = '';
     render();
