@@ -340,22 +340,62 @@ async function createPost() {
     toast('Could not publish: ' + (error.message || 'Unknown error'));
   }
 }
-function likePost(id) {
+async function likePost(id) {
+  const client = window.clickVibeSupabase;
   const post = posts.find(p => p.id === id);
-  if (!post) return;
 
-  post.likes = post.likes || 0;
+  if (!client || !post) return;
 
-  if (post.supportedByMe) {
-    post.likes = Math.max(0, post.likes - 1);
-    post.supportedByMe = false;
-  } else {
-    post.likes += 1;
-    post.supportedByMe = true;
+  try {
+    const { data: sessionData, error: sessionError } =
+      await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+      toast('Please sign in to support a post.');
+      return;
+    }
+
+    if (post.supportedByMe) {
+      const { error } = await client
+        .from('community_likes')
+        .delete()
+        .eq('post_id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      post.supportedByMe = false;
+    } else {
+      const { error } = await client
+        .from('community_likes')
+        .insert({
+          post_id: id,
+          user_id: user.id
+        });
+
+      if (error) throw error;
+
+      post.supportedByMe = true;
+    }
+
+    const { count, error: countError } = await client
+      .from('community_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', id);
+
+    if (countError) throw countError;
+
+    post.likes = count ?? 0;
+    render();
+
+  } catch (error) {
+    console.error('ClickVibe: Like failed:', error);
+    toast('Could not update support: ' + (error.message || 'Unknown error'));
   }
-
-  persist();
-  render();
 }
 function toggleComments(id){$('comments-'+id).classList.toggle('hidden')}
 function commentPost(id){const input=$('commentinput-'+id),val=input.value.trim(),p=posts.find(p=>p.id===id);if(!val||!p)return;p.comments.push(val);persist();render();$('comments-'+id)?.classList.remove('hidden');toast('Reply added locally.');}
