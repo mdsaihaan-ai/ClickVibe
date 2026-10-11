@@ -3,6 +3,8 @@ package com.community.clickvibe
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.graphics.Color
+import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -24,6 +26,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.decorView.setBackgroundColor(Color.rgb(9, 11, 15))
 
         handleCallbackIntent(intent)
 
@@ -39,6 +42,8 @@ class MainActivity : ComponentActivity() {
                         ),
                     factory = { context ->
                         WebView(context).apply {
+                            setBackgroundColor(Color.rgb(9, 11, 15))
+                            visibility = View.INVISIBLE
                             webView = this
 
                             settings.javaScriptEnabled = true
@@ -112,6 +117,12 @@ class MainActivity : ComponentActivity() {
     }
 
     inner class ClickVibeBridge {
+        @JavascriptInterface
+        fun showWebView() {
+            runOnUiThread {
+                webView?.visibility = View.VISIBLE
+            }
+        }
 
         @JavascriptInterface
         fun openOAuth(url: String) {

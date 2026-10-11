@@ -3,7 +3,78 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111210">
 <title>ClickVibe Community</title>
+
 <style>
+    #communityLoading {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #0b0b0d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #ffffff;
+    }
+
+    #communityLoading.hidden {
+    display: none;
+    }
+
+    .loading-content {
+    padding: 24px;
+    }
+
+    .loading-logo {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #788797;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #283442, #11161d);
+  overflow: hidden;
+}
+
+.loading-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
+    .loading-content h2 {
+    margin: 0 0 10px;
+    font-size: 24px;
+    font-weight: 800;
+    }
+
+    .loading-content p {
+    margin: 0;
+    color: #a8a8ad;
+    font-size: 14px;
+    }
+
+    .loading-spinner {
+    width: 28px;
+    height: 28px;
+    margin: 28px auto 0;
+    border: 3px solid #343d48;
+    border-top-color: #dce4cd;
+    border-radius: 50%;
+    animation: cvSpin 0.8s linear infinite;
+    }
+
+    @keyframes cvSpin {
+    to {
+    transform: rotate(360deg);
+    }
+    }
 :root{color-scheme:dark;--bg:#090b0f;--panel:#11151b;--panel2:#171d25;--line:#28313c;--text:#f1f4f8;--muted:#929eac;--gold:#c8d1dc;--green:#9bd7bb;--red:#e3a5a5;--glow:#b9c6d81a;--radius:18px}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 50% -15%,#283545 0,transparent 43%),var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.01em}button,input,textarea,select{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:3px}.app{min-height:100dvh;padding-bottom:88px}.top{position:sticky;top:0;z-index:5;background:#0b0e13eF;backdrop-filter:blur(22px);border-bottom:1px solid #29323d;padding:13px 17px;display:flex;align-items:center;gap:11px}.mark{height:40px;width:40px;border:1px solid #788797;border-radius:13px;display:grid;place-items:center;color:#edf2f7;font-weight:850;font-size:12px;letter-spacing:-.05em;background:linear-gradient(145deg,#283442,#11161d);box-shadow:inset 0 1px #ffffff16,0 5px 18px #0004}.mark img {
   width: 100%;
@@ -115,6 +186,16 @@ overflow-wrap: anywhere;
         </div>
     </div>
 </div>
+<div id="communityLoading" class="hidden">
+    <div class="loading-content">
+        <div class="loading-logo">
+            <img src="ClickVibeLOGO.jpeg" alt="ClickVibe logo">
+        </div>
+        <h2>Entrepreneurs connected!</h2>
+        <p>Bringing your community together...</p>
+        <div class="loading-spinner"></div>
+    </div>
+</div>
 <div class="app">
     <header class="top">
         <div class="mark">
@@ -195,7 +276,7 @@ const seed=[
 {id:'p4',type:'Idea',title:'Public venture logs',body:'Give each venture a timeline of hypotheses, experiments, costs, outcomes and next steps so people can learn from the actual process—not only the success story.',status:'Idea',category:'Product',author:'Community',time:'Sample · 3 days ago',comments:[],likes:2,updateCount:0},
 {id:'p5',type:'Venture',title:'ClickVibe Community',body:'A home for business ideas, ventures, thoughtful feedback and transparent progress. This prototype tests whether organizing work around ventures is more useful than a stream of chat.',status:'Testing',category:'Community',author:'Saihaan',time:'Sample · Today',comments:[],likes:6,updateCount:2}
 ];
-let posts;try{posts=JSON.parse(localStorage.getItem('cv_posts'))||seed}catch(e){posts=seed}let backing;try{backing=JSON.parse(localStorage.getItem('cv_backing'))||[{name:'ClickVibe Community',need:'Feedback',why:'Looking for feedback on the venture-first structure and what would make people return.',author:'Saihaan'}]}catch(e){backing=[]}let filter='All';
+let posts=[];let backing;try{backing=JSON.parse(localStorage.getItem('cv_backing'))||[{name:'ClickVibe Community',need:'Feedback',why:'Looking for feedback on the venture-first structure and what would make people return.',author:'Saihaan'}]}catch(e){backing=[]}let filter='All';
 const $=id=>document.getElementById(id);function persist(){try{localStorage.setItem('cv_posts',JSON.stringify(posts));localStorage.setItem('cv_backing',JSON.stringify(backing))}catch(e){}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function iconFor(t){return ({Idea:'✳',Venture:'↗',Update:'↻',Discussion:'☷',Announcement:'✦'})[t]||'•'}
@@ -742,7 +823,8 @@ async function cvFinishLogin(user) {
   const client = window.clickVibeSupabase;
 
   document.getElementById("authView").classList.add("hidden");
-  document.querySelector(".app").classList.remove("hidden");
+document.querySelector(".app").classList.add("hidden");
+document.getElementById("communityLoading").classList.remove("hidden");
 
   const name =
     user.user_metadata?.full_name ||
@@ -786,6 +868,9 @@ async function cvFinishLogin(user) {
 
   await loadCommunityPosts();
 subscribeCommunityRealtime();
+document.querySelector(".app").classList.remove("hidden");
+document.getElementById("communityLoading").classList.add("hidden");
+window.ClickVibeAndroid?.showWebView();
 toast("Signed in successfully.");
 }
 
@@ -880,6 +965,7 @@ async function cvInitAuth() {
     cvAuthMessage(
       "Supabase SDK unavailable. Check the script tags and internet connection."
     );
+    window.ClickVibeAndroid?.showWebView();
     return;
   }
 
@@ -889,14 +975,16 @@ async function cvInitAuth() {
   const { data, error } = await client.auth.getSession();
 
   if (error) {
-    cvAuthMessage("Couldn't check your session: " + error.message);
-    return;
+  cvAuthMessage("Couldn't check your session: " + error.message);
+  window.ClickVibeAndroid?.showWebView();
+  return;
   }
 
   if (data.session) {
     await cvFinishLogin(data.session.user);
   } else {
-    showLogin("user");
+  showLogin("user");
+  window.ClickVibeAndroid?.showWebView();
   }
 
   client.auth.onAuthStateChange((event, session) => {
