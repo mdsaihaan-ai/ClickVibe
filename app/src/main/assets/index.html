@@ -141,7 +141,58 @@ margin-top: 22px;
 
 #authMessage {
 overflow-wrap: anywhere;
-} </style></head>
+}
+#deletePostDialog {
+  width: calc(100% - 40px);
+  max-width: 360px;
+  padding: 24px;
+  border: 1px solid #35414e;
+  border-radius: 18px;
+  background: #11151b;
+  color: #f1f4f8;
+  box-shadow: 0 20px 60px #0009;
+}
+
+#deletePostDialog::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+#deletePostDialog h3 {
+  margin: 0 0 10px;
+  font-size: 19px;
+}
+
+#deletePostDialog p {
+  margin: 0 0 24px;
+  color: #aab4c0;
+  font-size: 13px;
+}
+
+.delete-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.delete-dialog-actions button {
+  padding: 10px 15px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.delete-dialog-cancel {
+  background: #202630;
+  color: #f1f4f8;
+  border: 1px solid #35414e;
+}
+
+.delete-dialog-confirm {
+  background: #b93838;
+  color: white;
+  border: 1px solid #b93838;
+}
+</style></head>
 
 <body>
 <div id="authView" class="hidden">
@@ -614,7 +665,44 @@ async function deleteComment(commentId, postId) {
     toast('Could not delete comment: ' + (error.message || 'Unknown error'));
   }
 }
-async function deletePost(id) {
+let pendingDeletePostId = null;
+
+function closeDeletePostDialog() {
+  const dialog = document.getElementById('deletePostDialog');
+
+  if (dialog && dialog.open) {
+    dialog.close();
+  }
+
+  pendingDeletePostId = null;
+}
+
+async function confirmDeletePost() {
+  const id = pendingDeletePostId;
+
+  closeDeletePostDialog();
+
+  if (id === null || id === undefined) {
+    return;
+  }
+
+  await deletePost(id, true);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const dialog = document.getElementById('deletePostDialog');
+  const cancelButton = document.getElementById('cancelDeletePost');
+  const confirmButton = document.getElementById('confirmDeletePost');
+
+  if (!dialog || !cancelButton || !confirmButton) {
+    console.error('ClickVibe: Delete dialog elements not found.');
+    return;
+  }
+
+  cancelButton.addEventListener('click', closeDeletePostDialog);
+  confirmButton.addEventListener('click', confirmDeletePost);
+});
+async function deletePost(id, confirmed = false) {
   const client = window.clickVibeSupabase;
   const post = posts.find(p => p.id === id);
 
@@ -637,8 +725,17 @@ async function deletePost(id) {
     return;
   }
 
-  if (!confirm('Delete this post permanently? This cannot be undone.')) {
+  if (!confirmed) {
+  const dialog = document.getElementById('deletePostDialog');
+
+  if (!dialog || typeof dialog.showModal !== 'function') {
+    toast('Could not open delete confirmation.');
     return;
+  }
+
+  pendingDeletePostId = id;
+  dialog.showModal();
+  return;
   }
 
   try {
@@ -1041,4 +1138,25 @@ async function cvInitAuth() {
 }
 
 cvInitAuth();
-</script></body></html>
+</script>
+<dialog id="deletePostDialog">
+    <h3>Delete this post permanently?</h3>
+    <p>This action cannot be undone.</p>
+
+    <div class="delete-dialog-actions">
+        <button
+                type="button"
+                id="cancelDeletePost"
+                class="delete-dialog-cancel">
+            Cancel
+        </button>
+
+        <button
+                type="button"
+                id="confirmDeletePost"
+                class="delete-dialog-confirm">
+            Delete
+        </button>
+    </div>
+</dialog>
+</body></html>
