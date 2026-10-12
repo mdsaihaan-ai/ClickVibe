@@ -331,11 +331,14 @@ let posts=[];let backing;try{backing=JSON.parse(localStorage.getItem('cv_backing
 const $=id=>document.getElementById(id);function persist(){try{localStorage.setItem('cv_posts',JSON.stringify(posts));localStorage.setItem('cv_backing',JSON.stringify(backing))}catch(e){}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function iconFor(t){return ({Idea:'✳',Venture:'↗',Update:'↻',Discussion:'☷',Announcement:'✦'})[t]||'•'}
-function card(p,compact=false){return `<article class="card"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div>${p.author_id && p.author_id === window.cvUserId ? `<button class="btn small" onclick="deletePost('${p.id}')">Delete</button>` : ''}<div><div class="author">${esc(p.author)}</div><div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
+function card(p,compact=false){return `<article class="card"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div>${p.author_id && (
+  p.author_id === window.cvUserId ||
+  window.cvIsDeveloper === true
+) ? `<button class="btn small" onclick="deletePost('${p.id}')">Delete</button>` : ''}<div><div class="author">${esc(p.author)}</div><div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
   class="${p.supportedByMe ? 'supported' : ''}"
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
-</button><button onclick="toggleComments('${p.id}')">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId ? ` <button class="btn small" onclick="deleteComment('${c.id}','${p.id}')">Delete</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}')">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
+</button><button onclick="toggleComments('${p.id}')">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="deleteComment('${c.id}','${p.id}')">Delete</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}')">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p></article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile')render();}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
@@ -640,11 +643,18 @@ async function deleteComment(commentId, postId) {
       return;
     }
 
-    const { error } = await client
+    const isDeveloper = window.cvIsDeveloper === true;
+
+    let deleteQuery = client
       .from('community_comments')
       .delete()
-      .eq('id', commentId)
-      .eq('user_id', user.id);
+      .eq('id', commentId);
+
+    if (!isDeveloper) {
+      deleteQuery = deleteQuery.eq('user_id', user.id);
+    }
+
+    const { error } = await deleteQuery;
 
     if (error) throw error;
 
@@ -720,9 +730,9 @@ async function deletePost(id, confirmed = false) {
 
   const user = sessionData.session.user;
 
-  if (user.id !== post.author_id) {
-    toast('You can only delete your own posts.');
-    return;
+  if (user.id !== post.author_id && window.cvIsDeveloper !== true) {
+  toast('You can only delete your own posts.');
+  return;
   }
 
   if (!confirmed) {
@@ -739,11 +749,16 @@ async function deletePost(id, confirmed = false) {
   }
 
   try {
-    const { error } = await client
-      .from('community_posts')
-      .delete()
-      .eq('id', id)
-      .eq('author_id', user.id);
+    let deleteQuery = client
+  .from('community_posts')
+  .delete()
+  .eq('id', id);
+
+if (window.cvIsDeveloper !== true) {
+  deleteQuery = deleteQuery.eq('author_id', user.id);
+}
+
+const { error } = await deleteQuery;
 
     if (error) throw error;
 
@@ -1001,7 +1016,9 @@ document.getElementById("communityLoading").classList.remove("hidden");
         throw error;
       }
 
-      roleElement.textContent = isAdmin === true ? "Developer" : "Member";
+      window.cvIsDeveloper = isAdmin === true;
+roleElement.textContent = window.cvIsDeveloper ? "Developer" : "Member";
+console.log("ClickVibe: Verified role:", window.cvIsDeveloper ? "Developer" : "Member");
     } catch (error) {
       console.error("ClickVibe: Role verification failed", error);
       roleElement.textContent = "Role unverified";
