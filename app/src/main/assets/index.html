@@ -334,7 +334,10 @@ function iconFor(t){return ({Idea:'✳',Venture:'↗',Update:'↻',Discussion:'�
 function card(p,compact=false){return `<article class="card"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div>${p.author_id && (
   p.author_id === window.cvUserId ||
   window.cvIsDeveloper === true
-) ? `<button class="btn small" onclick="deletePost('${p.id}')">Delete</button>` : ''}<div><div class="author">${esc(p.author)}</div><div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
+) ? `
+  ${window.cvIsDeveloper === true ? `<button class="btn small" onclick="editPost('${p.id}')">Edit</button>` : ''}
+  <button class="btn small" onclick="deletePost('${p.id}')">Delete</button>
+` : ''}<div><div class="author">${esc(p.author)}</div><div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
   class="${p.supportedByMe ? 'supported' : ''}"
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
@@ -464,6 +467,44 @@ function subscribeCommunityRealtime() {
       console.log('ClickVibe Realtime:', status);
     });
 }
+let editingPostId = null;
+
+function editPost(id) {
+  const post = posts.find(p => p.id === id);
+
+  if (!post) {
+    toast('Could not find this post.');
+    return;
+  }
+
+  if (
+    post.author_id !== window.cvUserId &&
+    window.cvIsDeveloper !== true
+  ) {
+    toast('You can only edit your own posts.');
+    return;
+  }
+
+  editingPostId = id;
+
+  $('postType').value = post.type;
+  $('postTitle').value = post.title || '';
+  $('postBody').value = post.body || '';
+  $('postStatus').value = post.status || 'Idea';
+  $('postCategory').value = post.category || 'Business';
+
+  $('createTitle').textContent = 'Edit post';
+
+  const saveButton = document.querySelector(
+    '#createView .formcard .btn.primary'
+  );
+
+  if (saveButton) {
+    saveButton.textContent = 'Save changes';
+  }
+
+  navigate('create');
+}
 async function createPost() {
   const title = $('postTitle').value.trim();
   const body = $('postBody').value.trim();
@@ -509,6 +550,65 @@ async function createPost() {
       'Member'
     ).trim();
 
+    // Update an existing post when edit mode is active.
+if (editingPostId !== null) {
+  let updateQuery = client
+    .from('community_posts')
+    .update({
+      type: type,
+      title: title,
+      body: body,
+      status: $('postStatus').value,
+      category: $('postCategory').value
+    })
+    .eq('id', editingPostId);
+
+  if (window.cvIsDeveloper !== true) {
+    updateQuery = updateQuery.eq('author_id', user.id);
+  }
+
+  const { data: updatedPost, error: updateError } = await updateQuery
+    .select()
+    .single();
+
+  if (updateError) throw updateError;
+
+  const existingPost = posts.find(p => p.id === editingPostId);
+
+  if (existingPost) {
+    existingPost.type = updatedPost.type;
+    existingPost.title = updatedPost.title;
+    existingPost.body = updatedPost.body;
+    existingPost.status = updatedPost.status;
+    existingPost.category = updatedPost.category;
+  }
+
+  const updatedType = updatedPost.type;
+
+  editingPostId = null;
+  $('createTitle').textContent = 'Create a post';
+
+  const saveButton = document.querySelector(
+    '#createView .formcard .btn.primary'
+  );
+
+  if (saveButton) {
+    saveButton.textContent = 'Publish locally';
+  }
+
+  render();
+
+  navigate(
+    updatedType === 'Idea'
+      ? 'ideas'
+      : updatedType === 'Venture'
+        ? 'ventures'
+        : 'home'
+  );
+
+  toast('Post updated successfully!');
+  return;
+}
     // Save the post to Supabase.
     const { data: savedPost, error: insertError } = await client
       .from('community_posts')
