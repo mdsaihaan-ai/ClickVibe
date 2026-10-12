@@ -356,7 +356,7 @@ let posts=[];let backing;try{backing=JSON.parse(localStorage.getItem('cv_backing
 const $=id=>document.getElementById(id);function persist(){try{localStorage.setItem('cv_posts',JSON.stringify(posts));localStorage.setItem('cv_backing',JSON.stringify(backing))}catch(e){}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function iconFor(t){return ({Idea:'✳',Venture:'↗',Update:'↻',Discussion:'☷',Announcement:'✦'})[t]||'•'}
-function card(p,compact=false){return `<article class="card"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div>${p.author_id && (
+function card(p,compact=false){return `<article class="card" data-post-id="${p.id}"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div>${p.author_id && (
   p.author_id === window.cvUserId ||
   window.cvIsDeveloper === true
 ) ? `
@@ -366,7 +366,7 @@ function card(p,compact=false){return `<article class="card"><div class="cardtop
   class="${p.supportedByMe ? 'supported' : ''}"
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
-</button><button onclick="toggleComments('${p.id}')">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="requestDeleteComment('${c.id}','${p.id}')">Delete</button>` : ''}${window.cvIsDeveloper === true ? ` <button class="btn small" onclick="editComment('${c.id}','${p.id}')">Edit</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}')">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
+<button onclick="toggleComments('${p.id}', this)">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="comment-section hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="requestDeleteComment('${c.id}','${p.id}', this)">Delete</button>` : ''}${window.cvIsDeveloper === true ? ` <button class="btn small" onclick="editComment('${c.id}','${p.id}', this)">Edit</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}', this)">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p></article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile')render();}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
@@ -746,8 +746,26 @@ async function likePost(id) {
     toast('Could not update support: ' + (error.message || 'Unknown error'));
   }
 }
-function toggleComments(id){$('comments-'+id).classList.toggle('hidden')}
-function requestDeleteComment(commentId, postId) {
+function toggleComments(id, button) {
+  const cardElement = button?.closest('.card');
+  const comments = cardElement?.querySelector('.comment-section');
+
+  if (comments) {
+    comments.classList.toggle('hidden');
+  }
+}
+function reopenComments(postId, containerId) {
+  const root = containerId ? $(containerId) : document;
+
+  if (!root) return;
+
+  const cardElement = [...root.querySelectorAll('.card[data-post-id]')]
+    .find(card => card.dataset.postId === String(postId));
+
+  cardElement?.querySelector('.comment-section')?.classList.remove('hidden');
+}
+function requestDeleteComment(commentId, postId, button) {
+  const containerId = button?.closest('#feed, #ideasList, #venturesList, #myActivity')?.id;
   if (
     !commentId ||
     !postId
@@ -764,7 +782,8 @@ function requestDeleteComment(commentId, postId) {
   }
 
   pendingDeleteCommentId = commentId;
-  pendingDeleteCommentPostId = postId;
+pendingDeleteCommentPostId = postId;
+pendingDeleteCommentContainerId = containerId || null;
 
   dialog.showModal();
 }
@@ -778,11 +797,13 @@ function closeDeleteCommentDialog() {
 
   pendingDeleteCommentId = null;
   pendingDeleteCommentPostId = null;
+  pendingDeleteCommentContainerId = null;
 }
 
 async function confirmDeleteComment() {
   const commentId = pendingDeleteCommentId;
   const postId = pendingDeleteCommentPostId;
+  const containerId = pendingDeleteCommentContainerId;
 
   closeDeleteCommentDialog();
 
@@ -790,9 +811,9 @@ async function confirmDeleteComment() {
     return;
   }
 
-  await deleteComment(commentId, postId);
+  await deleteComment(commentId, postId, containerId);
 }
-async function deleteComment(commentId, postId) {
+async function deleteComment(commentId, postId, containerId) {
   const client = window.clickVibeSupabase;
 
   if (!client) {
@@ -836,16 +857,17 @@ async function deleteComment(commentId, postId) {
       );
     }
 
-    render();
-    $('comments-' + postId)?.classList.remove('hidden');
-    toast('Comment deleted.');
+   render();
+reopenComments(postId, containerId);
+toast('Comment deleted.');
 
   } catch (error) {
     console.error('ClickVibe: Comment deletion failed:', error);
     toast('Could not delete comment: ' + (error.message || 'Unknown error'));
   }
 }
-async function editComment(commentId, postId) {
+async function editComment(commentId, postId, button) {
+  const containerId = button?.closest('#feed, #ideasList, #venturesList, #myActivity')?.id;
   if (window.cvIsDeveloper !== true) {
     toast('Only developers can edit comments.');
     return;
@@ -925,10 +947,10 @@ async function editComment(commentId, postId) {
 
       comment.body = data.body;
 
-      dialog.close();
+            dialog.close();
       render();
 
-      $('comments-' + postId)?.classList.remove('hidden');
+      reopenComments(postId, containerId);
 
       toast('Comment updated successfully!');
     } catch (error) {
@@ -942,6 +964,7 @@ async function editComment(commentId, postId) {
 let pendingDeletePostId = null;
 let pendingDeleteCommentId = null;
 let pendingDeleteCommentPostId = null;
+let pendingDeleteCommentContainerId = null;
 
 function closeDeletePostDialog() {
   const dialog = document.getElementById('deletePostDialog');
@@ -1049,8 +1072,14 @@ const { error } = await deleteQuery;
     toast('Could not delete the post. Please try again.');
   }
 }
-async function commentPost(id) {
-  const input = $('commentinput-' + id);
+async function commentPost(id, button) {
+  const input = button?.closest('.card')?.querySelector('.commentbox input');
+
+  if (!input) {
+    toast('Could not find the comment box.');
+    return;
+  }
+
   const body = input.value.trim();
   const post = posts.find(p => p.id === id);
   const client = window.clickVibeSupabase;
