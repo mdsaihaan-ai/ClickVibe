@@ -450,6 +450,46 @@ if (commentsError) throw commentsError;
     toast('Could not load community posts. Check the connection.');
   }
 }
+async function loadBackingRequests() {
+  const client = window.clickVibeSupabase;
+
+  if (!client) return;
+
+  try {
+    const { data: rows, error } = await client
+      .from('backing_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    backing = (rows || []).map(row => ({
+      id: row.id,
+      name: row.venture_name,
+      need: row.resources,
+      why: row.reason,
+      author: row.author,
+      created_by: row.created_by,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    }));
+
+    render();
+
+    console.log(
+      'ClickVibe: Backing requests loaded:',
+      backing.length
+    );
+
+  } catch (error) {
+    console.error(
+      'ClickVibe: Could not load backing requests:',
+      error
+    );
+
+    toast('Could not load backing requests. Check the connection.');
+  }
+}
 function subscribeCommunityRealtime() {
   const client = window.clickVibeSupabase;
 
@@ -1333,7 +1373,8 @@ console.log("ClickVibe: Verified role:", window.cvIsDeveloper ? "Developer" : "M
     }
   }
 
-  await loadCommunityPosts();
+ await loadCommunityPosts();
+await loadBackingRequests();
 subscribeCommunityRealtime();
 document.querySelector(".app").classList.remove("hidden");
 document.getElementById("communityLoading").classList.add("hidden");
