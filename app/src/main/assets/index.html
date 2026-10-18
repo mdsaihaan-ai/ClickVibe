@@ -217,6 +217,43 @@ overflow-wrap: anywhere;
 #editCommentDialog .edit-comment-textarea::placeholder {
     color: #777;
 }
+#editBackingDialog {
+  width: calc(100% - 40px);
+  max-width: 420px;
+  padding: 24px;
+  border: 1px solid #35414e;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #171d25, #11151b);
+  color: #f1f4f8;
+  box-shadow: 0 20px 60px #0009;
+}
+
+#editBackingDialog::backdrop {
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+#editBackingDialog h3 {
+  margin: 0 0 5px;
+  font-size: 20px;
+}
+
+#editBackingDialog .dialog-subtitle {
+  margin: 0 0 20px;
+  color: #929eac;
+  font-size: 12px;
+}
+
+#editBackingDialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 20px;
+}
+
+#editBackingDialog .dialog-actions button {
+  flex: 1;
+}
 </style></head>
 
 <body>
@@ -1257,48 +1294,71 @@ async function submitBacking() {
     toast('Could not post request: ' + (error.message || 'Unknown error'));
   }
 }
-async function editBacking(id) {
+let editingBackingId = null;
+
+function editBacking(id) {
+  if (window.cvIsDeveloper !== true) {
+    toast('Only developers can edit backing requests.');
+    return;
+  }
+
+  const item = backing.find(b => b.id === id);
+
+  if (!item) {
+    toast('Backing request not found.');
+    return;
+  }
+
+  editingBackingId = id;
+
+  $('editBackingName').value = item.name;
+  $('editBackingNeed').value = item.need;
+  $('editBackingWhy').value = item.why;
+
+  $('editBackingDialog').showModal();
+}
+
+function closeEditBacking() {
+  $('editBackingDialog').close();
+  editingBackingId = null;
+}
+
+async function saveBackingEdit() {
   if (window.cvIsDeveloper !== true) {
     toast('Only developers can edit backing requests.');
     return;
   }
 
   const client = window.clickVibeSupabase;
-  const item = backing.find(b => b.id === id);
+  const id = editingBackingId;
+  const name = $('editBackingName').value.trim();
+  const need = $('editBackingNeed').value;
+  const why = $('editBackingWhy').value.trim();
 
-  if (!client || !item) {
-    toast('Backing request not found.');
+  if (!id || !client) {
+    toast('Unable to save changes.');
     return;
   }
 
-  const name = prompt('Venture name:', item.name);
-  if (name === null) return;
-
-  const need = prompt(
-    'Resource needed:',
-    item.need
-  );
-  if (need === null) return;
-
-  const why = prompt(
-    'Why it matters:',
-    item.why
-  );
-  if (why === null) return;
-
-  if (!name.trim() || !need.trim() || !why.trim()) {
+  if (!name || !why) {
     toast('All fields must be filled in.');
     return;
   }
+
+  const saveButton = document.querySelector(
+    '#editBackingDialog .btn.primary'
+  );
+
+  if (saveButton) saveButton.disabled = true;
 
   try {
     const { data, error } = await client
       .from('backing_requests')
       .update({
-        title: name.trim(),
-        venture_name: name.trim(),
-        resources: need.trim(),
-        reason: why.trim(),
+        title: name,
+        venture_name: name,
+        resources: need,
+        reason: why,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -1307,13 +1367,20 @@ async function editBacking(id) {
 
     if (error) throw error;
 
-    Object.assign(item, {
-      name: data.venture_name,
-      need: data.resources,
-      why: data.reason,
-      author: data.author,
-      updated_at: data.updated_at
-    });
+    const item = backing.find(b => b.id === id);
+
+    if (item) {
+      Object.assign(item, {
+        name: data.venture_name,
+        need: data.resources,
+        why: data.reason,
+        author: data.author,
+        updated_at: data.updated_at
+      });
+    }
+
+    $('editBackingDialog').close();
+    editingBackingId = null;
 
     render();
     toast('Backing request updated.');
@@ -1321,6 +1388,9 @@ async function editBacking(id) {
   } catch (error) {
     console.error('ClickVibe: Backing edit failed:', error);
     toast('Could not edit request: ' + (error.message || 'Unknown error'));
+
+  } finally {
+    if (saveButton) saveButton.disabled = false;
   }
 }
 
@@ -1754,6 +1824,38 @@ cvInitAuth();
                 class="delete-dialog-confirm">
             Delete
         </button>
+    </div>
+</dialog>
+<dialog id="editBackingDialog">
+    <h3>Edit backing request</h3>
+    <p class="dialog-subtitle">Update your venture's resource needs.</p>
+
+    <div class="field">
+        <label for="editBackingName">Venture name</label>
+        <input id="editBackingName" type="text">
+    </div>
+
+    <div class="field">
+        <label for="editBackingNeed">Resource needed</label>
+        <select id="editBackingNeed">
+            <option>Feedback</option>
+            <option>Distribution</option>
+            <option>Equipment</option>
+            <option>Funding discussion</option>
+            <option>Skills / collaborator</option>
+        </select>
+    </div>
+
+    <div class="field">
+        <label for="editBackingWhy">Why it matters</label>
+        <textarea id="editBackingWhy"></textarea>
+    </div>
+
+    <div class="dialog-actions">
+        <button class="btn" type="button"
+                onclick="closeEditBacking()">Cancel</button>
+        <button class="btn primary" type="button"
+                onclick="saveBackingEdit()">Save changes</button>
     </div>
 </dialog>
 </body></html>
