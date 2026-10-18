@@ -1183,7 +1183,80 @@ async function commentPost(id, button) {
     toast('Could not add reply: ' + (error.message || 'Unknown error'));
   }
 }
-function submitBacking(){let name=$('backName').value.trim(),why=$('backWhy').value.trim();if(!name||!why){toast('Add the venture name and what it needs.');return}backing.unshift({name,need:$('backNeed').value,why,author:$('profileName').value||'Saihaan'});persist();$('backName').value='';$('backWhy').value='';render();toast('Resource request posted locally.');}
+async function submitBacking() {
+  const client = window.clickVibeSupabase;
+  const name = $('backName').value.trim();
+  const why = $('backWhy').value.trim();
+  const need = $('backNeed').value;
+
+  if (window.cvIsDeveloper !== true) {
+    toast('Only developers can post backing requests.');
+    return;
+  }
+
+  if (!name || !why) {
+    toast('Add the venture name and what it needs.');
+    return;
+  }
+
+  if (!client) {
+    toast('Supabase is unavailable. Check your connection.');
+    return;
+  }
+
+  try {
+    const { data: sessionData, error: sessionError } =
+      await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+      toast('Please sign in first.');
+      return;
+    }
+
+    const { data, error } = await client
+      .from('backing_requests')
+      .insert({
+        title: name,
+        venture_name: name,
+        resources: need,
+        reason: why,
+        author:
+          $('profileName').value.trim() ||
+          user.email?.split('@')[0] ||
+          'Developer',
+        created_by: user.id
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    backing.unshift({
+      id: data.id,
+      name: data.venture_name,
+      need: data.resources,
+      why: data.reason,
+      author: data.author,
+      created_by: data.created_by,
+      created_at: data.created_at,
+      updated_at: data.updated_at
+    });
+
+    $('backName').value = '';
+    $('backWhy').value = '';
+
+    render();
+    toast('Backing request saved to the server.');
+
+  } catch (error) {
+    console.error('ClickVibe: Backing request failed:', error);
+    toast('Could not post request: ' + (error.message || 'Unknown error'));
+  }
+}
 function saveProfile(){try{localStorage.setItem('cv_profile',JSON.stringify({name:$('profileName').value,bio:$('profileBio').value}))}catch(e){}toast('Profile saved on this device.');render()}
 let toastTimer;function toast(msg){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.remove(),2200)}
 document.querySelectorAll('#feedFilters .chip').forEach(c=>c.addEventListener('click',()=>{filter=c.dataset.filter;document.querySelectorAll('#feedFilters .chip').forEach(x=>x.classList.toggle('active',x===c));render()}));try{const profile=JSON.parse(localStorage.getItem('cv_profile'));if(profile){$('profileName').value=profile.name||'Saihaan';$('profileBio').value=profile.bio||''}}catch(e){}render();
@@ -1365,6 +1438,11 @@ document.getElementById("communityLoading").classList.remove("hidden");
       }
 
       window.cvIsDeveloper = isAdmin === true;
+      const backingForm = document.querySelector('#backingView .formcard');
+
+if (backingForm) {
+  backingForm.classList.toggle('hidden', !window.cvIsDeveloper);
+}
 roleElement.textContent = window.cvIsDeveloper ? "Developer" : "Member";
 console.log("ClickVibe: Verified role:", window.cvIsDeveloper ? "Developer" : "Member");
     } catch (error) {
