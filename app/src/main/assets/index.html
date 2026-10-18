@@ -254,6 +254,50 @@ overflow-wrap: anywhere;
 #editBackingDialog .dialog-actions button {
   flex: 1;
 }
+    #deleteBackingDialog {
+  width: calc(100% - 40px);
+  max-width: 360px;
+  padding: 24px;
+  border: 1px solid #35414e;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #171d25, #11151b);
+  color: #f1f4f8;
+  box-shadow: 0 20px 60px #0009;
+}
+
+#deleteBackingDialog::backdrop {
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+#deleteBackingDialog h3 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+#deleteBackingDialog .delete-message {
+  margin: 0;
+  color: #929eac;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+#deleteBackingDialog .dialog-actions {
+  display: flex;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+#deleteBackingDialog .dialog-actions button {
+  flex: 1;
+}
+
+#deleteBackingDialog .delete-confirm {
+  background: #a93636;
+  border-color: #a93636;
+  color: #fff;
+}
 </style></head>
 
 <body>
@@ -1394,28 +1438,51 @@ async function saveBackingEdit() {
   }
 }
 
-async function deleteBacking(id) {
+let deletingBackingId = null;
+
+function deleteBacking(id) {
   if (window.cvIsDeveloper !== true) {
     toast('Only developers can delete backing requests.');
     return;
   }
 
   const item = backing.find(b => b.id === id);
+
   if (!item) {
     toast('Backing request not found.');
     return;
   }
 
-  if (!confirm('Delete the backing request for "' + item.name + '"?')) {
+  deletingBackingId = id;
+  $('deleteBackingName').textContent = item.name;
+  $('deleteBackingDialog').showModal();
+}
+
+function closeDeleteBacking() {
+  $('deleteBackingDialog').close();
+  deletingBackingId = null;
+}
+
+async function confirmDeleteBacking() {
+  if (window.cvIsDeveloper !== true) {
+    toast('Only developers can delete backing requests.');
     return;
   }
 
+  const id = deletingBackingId;
   const client = window.clickVibeSupabase;
+  const item = backing.find(b => b.id === id);
 
-  if (!client) {
-    toast('Supabase is unavailable. Check your connection.');
+  if (!id || !item || !client) {
+    toast('Unable to delete this request.');
     return;
   }
+
+  const deleteButton = document.querySelector(
+    '#deleteBackingDialog .delete-confirm'
+  );
+
+  if (deleteButton) deleteButton.disabled = true;
 
   try {
     const { error } = await client
@@ -1426,12 +1493,19 @@ async function deleteBacking(id) {
     if (error) throw error;
 
     backing = backing.filter(b => b.id !== id);
+
+    $('deleteBackingDialog').close();
+    deletingBackingId = null;
+
     render();
     toast('Backing request deleted.');
 
   } catch (error) {
     console.error('ClickVibe: Backing deletion failed:', error);
     toast('Could not delete request: ' + (error.message || 'Unknown error'));
+
+  } finally {
+    if (deleteButton) deleteButton.disabled = false;
   }
 }
 function saveProfile(){try{localStorage.setItem('cv_profile',JSON.stringify({name:$('profileName').value,bio:$('profileBio').value}))}catch(e){}toast('Profile saved on this device.');render()}
@@ -1856,6 +1930,23 @@ cvInitAuth();
                 onclick="closeEditBacking()">Cancel</button>
         <button class="btn primary" type="button"
                 onclick="saveBackingEdit()">Save changes</button>
+    </div>
+</dialog>
+<dialog id="deleteBackingDialog">
+    <h3>Delete backing request?</h3>
+
+    <p class="delete-message">
+        This will permanently remove the request for
+        <strong id="deleteBackingName"></strong>
+        from the Backing Board.
+    </p>
+
+    <div class="dialog-actions">
+        <button class="btn" type="button"
+                onclick="closeDeleteBacking()">Cancel</button>
+
+        <button class="btn delete-confirm" type="button"
+                onclick="confirmDeleteBacking()">Delete</button>
     </div>
 </dialog>
 </body></html>
