@@ -367,7 +367,7 @@ function card(p,compact=false){return `<article class="card" data-post-id="${p.i
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
 <button onclick="toggleComments('${p.id}', this)">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="comment-section hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="requestDeleteComment('${c.id}','${p.id}', this)">Delete</button>` : ''}${window.cvIsDeveloper === true ? ` <button class="btn small" onclick="editComment('${c.id}','${p.id}', this)">Edit</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}', this)">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
-function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p></article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
+function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile')render();}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
 async function loadCommunityPosts() {
@@ -1255,6 +1255,113 @@ async function submitBacking() {
   } catch (error) {
     console.error('ClickVibe: Backing request failed:', error);
     toast('Could not post request: ' + (error.message || 'Unknown error'));
+  }
+}
+async function editBacking(id) {
+  if (window.cvIsDeveloper !== true) {
+    toast('Only developers can edit backing requests.');
+    return;
+  }
+
+  const client = window.clickVibeSupabase;
+  const item = backing.find(b => b.id === id);
+
+  if (!client || !item) {
+    toast('Backing request not found.');
+    return;
+  }
+
+  const name = prompt('Venture name:', item.name);
+  if (name === null) return;
+
+  const need = prompt(
+    'Resource needed:',
+    item.need
+  );
+  if (need === null) return;
+
+  const why = prompt(
+    'Why it matters:',
+    item.why
+  );
+  if (why === null) return;
+
+  if (!name.trim() || !need.trim() || !why.trim()) {
+    toast('All fields must be filled in.');
+    return;
+  }
+
+  try {
+    const { data, error } = await client
+      .from('backing_requests')
+      .update({
+        title: name.trim(),
+        venture_name: name.trim(),
+        resources: need.trim(),
+        reason: why.trim(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    Object.assign(item, {
+      name: data.venture_name,
+      need: data.resources,
+      why: data.reason,
+      author: data.author,
+      updated_at: data.updated_at
+    });
+
+    render();
+    toast('Backing request updated.');
+
+  } catch (error) {
+    console.error('ClickVibe: Backing edit failed:', error);
+    toast('Could not edit request: ' + (error.message || 'Unknown error'));
+  }
+}
+
+async function deleteBacking(id) {
+  if (window.cvIsDeveloper !== true) {
+    toast('Only developers can delete backing requests.');
+    return;
+  }
+
+  const item = backing.find(b => b.id === id);
+  if (!item) {
+    toast('Backing request not found.');
+    return;
+  }
+
+  if (!confirm('Delete the backing request for "' + item.name + '"?')) {
+    return;
+  }
+
+  const client = window.clickVibeSupabase;
+
+  if (!client) {
+    toast('Supabase is unavailable. Check your connection.');
+    return;
+  }
+
+  try {
+    const { error } = await client
+      .from('backing_requests')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    backing = backing.filter(b => b.id !== id);
+    render();
+    toast('Backing request deleted.');
+
+  } catch (error) {
+    console.error('ClickVibe: Backing deletion failed:', error);
+    toast('Could not delete request: ' + (error.message || 'Unknown error'));
   }
 }
 function saveProfile(){try{localStorage.setItem('cv_profile',JSON.stringify({name:$('profileName').value,bio:$('profileBio').value}))}catch(e){}toast('Profile saved on this device.');render()}
