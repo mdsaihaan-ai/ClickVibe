@@ -410,23 +410,47 @@ overflow-wrap: anywhere;
 
             <div class="field">
                 <label>Profile picture</label>
+
+
                 <input
                         id="profileAvatarFile"
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
                         onchange="previewProfileAvatar(event)"
+                        style="display:none"
                 >
-                <div class="muted" style="font-size:12px;margin-top:6px">
-                    Choose a JPG, PNG, or WebP image (max 2 MB).
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+                    <button
+                            class="btn primary"
+                            type="button"
+                            onclick="document.getElementById('profileAvatarFile').click()"
+                    >
+                        Choose New Picture
+                    </button>
+
+                    <button
+                            id="profileAvatarDeleteButton"
+                            class="btn"
+                            type="button"
+                            onclick="deleteProfileAvatar()"
+                            style="display:none"
+                    >
+                        Delete Picture
+                    </button>
                 </div>
+                <button
+                        class="btn primary"
+                        type="button"
+                        onclick="uploadProfileAvatar()"
+                        style="margin-top:10px"
+                >
+                    Save Profile Picture
+                </button>
+
+
             </div>
-            <button
-                    class="btn primary"
-                    type="button"
-                    onclick="uploadProfileAvatar()"
-            >
-                Save profile picture
-            </button>
+
 
             <div class="field">
                 <label>Display name</label>
@@ -475,7 +499,11 @@ let posts=[];let backing;try{backing=JSON.parse(localStorage.getItem('cv_backing
 const $=id=>document.getElementById(id);function persist(){try{localStorage.setItem('cv_posts',JSON.stringify(posts));localStorage.setItem('cv_backing',JSON.stringify(backing))}catch(e){}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function iconFor(t){return ({Idea:'✳',Venture:'↗',Update:'↻',Discussion:'☷',Announcement:'✦'})[t]||'•'}
-function card(p,compact=false){return `<article class="card" data-post-id="${p.id}"><div class="cardtop"><div class="avatar">${iconFor(p.type)}</div>${p.author_id && (
+function card(p,compact=false){return `<article class="card" data-post-id="${p.id}"><div class="cardtop"><div class="avatar" style="overflow:hidden;border-radius:50%;">
+    ${p.avatar_url
+        ? `<img src="${esc(p.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+        : iconFor(p.type)}
+</div>${p.author_id && (
   p.author_id === window.cvUserId ||
   window.cvIsDeveloper === true
 ) ? `
@@ -485,7 +513,10 @@ function card(p,compact=false){return `<article class="card" data-post-id="${p.i
   class="${p.supportedByMe ? 'supported' : ''}"
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
-<button onclick="toggleComments('${p.id}', this)">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="comment-section hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="requestDeleteComment('${c.id}','${p.id}', this)">Delete</button>` : ''}${window.cvIsDeveloper === true ? ` <button class="btn small" onclick="editComment('${c.id}','${p.id}', this)">Edit</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}', this)">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
+<button onclick="toggleComments('${p.id}', this)">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="comment-section hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `${c.avatar_url
+    ? `<img src="${esc(c.avatar_url)}" alt="" style="width:24px;height:24px;object-fit:cover;border-radius:50%;vertical-align:middle;margin-right:6px;">`
+    : `<span style="display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#2a3542;font-size:10px;margin-right:6px;">${esc((c.author || 'M').charAt(0).toUpperCase())}</span>`
+}<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="requestDeleteComment('${c.id}','${p.id}', this)">Delete</button>` : ''}${window.cvIsDeveloper === true ? ` <button class="btn small" onclick="editComment('${c.id}','${p.id}', this)">Edit</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}', this)">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile'){render();loadProfileAvatar();}}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
@@ -521,6 +552,18 @@ async function loadCommunityPosts() {
   .order('created_at', { ascending: true });
 
 if (commentsError) throw commentsError;
+const { data: profiles, error: profilesError } = await client
+    .from('member_profiles')
+    .select('user_id, avatar_url');
+
+if (profilesError) throw profilesError;
+
+const profileByUserId = new Map(
+    (profiles || []).map(profile => [
+        profile.user_id,
+        profile.avatar_url
+    ])
+);
 
     posts = (rows || []).map(row => {
       const postLikes = (likes || []).filter(
@@ -536,12 +579,14 @@ if (commentsError) throw commentsError;
         status: row.status,
         category: row.category,
         author: row.author_name,
+        avatar_url: profileByUserId.get(row.author_id) || null,
         time: new Date(row.created_at).toLocaleString(),
         comments: (savedComments || [])
   .filter(comment => comment.post_id === row.id)
   .map(comment => ({
     id: comment.id,
     author: comment.author_name,
+    avatar_url: profileByUserId.get(comment.user_id) || null,
     body: comment.body,
     user_id: comment.user_id,
     created_at: comment.created_at
@@ -1575,7 +1620,6 @@ function previewProfileAvatar(event) {
     fallback.style.display = 'none';
 }
 async function uploadProfileAvatar() {
-toast('loadProfileAvatar started');
     const client = window.clickVibeSupabase;
     const input = document.getElementById('profileAvatarFile');
     const file = input?.files?.[0];
@@ -1658,6 +1702,11 @@ toast('loadProfileAvatar started');
         fallback.style.display = 'none';
     }
 
+    const deleteButton = document.getElementById('profileAvatarDeleteButton');
+
+if (deleteButton) {
+    deleteButton.style.display = 'inline-block';
+}
     toast('Profile picture saved!');
 }
 async function loadProfileAvatar() {
@@ -1687,15 +1736,25 @@ try {
 
     if (!preview || !fallback) return;
 
-    if (profile?.avatar_url) {
-        preview.src = profile.avatar_url;
-        preview.style.display = 'block';
-        fallback.style.display = 'none';
-    } else {
-        preview.removeAttribute('src');
-        preview.style.display = 'none';
-        fallback.style.display = 'flex';
+    const deleteButton = document.getElementById('profileAvatarDeleteButton');
+
+if (profile?.avatar_url) {
+    preview.src = profile.avatar_url;
+    preview.style.display = 'block';
+    fallback.style.display = 'none';
+
+    if (deleteButton) {
+        deleteButton.style.display = 'inline-block';
     }
+} else {
+    preview.removeAttribute('src');
+    preview.style.display = 'none';
+    fallback.style.display = 'flex';
+
+    if (deleteButton) {
+        deleteButton.style.display = 'none';
+    }
+}
 } catch (error) {
     console.error('Could not load profile picture:', error);
 }
@@ -1705,6 +1764,97 @@ try {
 
 let toastTimer;function toast(msg){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.remove(),2200)}
 document.querySelectorAll('#feedFilters .chip').forEach(c=>c.addEventListener('click',()=>{filter=c.dataset.filter;document.querySelectorAll('#feedFilters .chip').forEach(x=>x.classList.toggle('active',x===c));render()}));try{const profile=JSON.parse(localStorage.getItem('cv_profile'));if(profile){$('profileName').value=profile.name||'Saihaan';$('profileBio').value=profile.bio||''}}catch(e){}render();
+
+async function deleteProfileAvatar() {
+    const client = window.clickVibeSupabase;
+
+    if (!client) {
+        toast('Connection unavailable.');
+        return;
+    }
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            toast('Please sign in first.');
+            return;
+        }
+
+        const { data: profile, error: profileError } = await client
+            .from('member_profiles')
+            .select('avatar_url')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        const avatarUrl = profile?.avatar_url;
+
+        const { error: updateError } = await client
+            .from('member_profiles')
+            .update({
+                avatar_url: null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('user_id', user.id);
+
+        if (updateError) throw updateError;
+
+        if (avatarUrl) {
+            const marker = '/storage/v1/object/public/avatars/';
+            const index = avatarUrl.indexOf(marker);
+
+            if (index !== -1) {
+                const filePath = decodeURIComponent(
+                    avatarUrl.slice(index + marker.length).split('?')[0]
+                );
+
+                const { error: removeError } = await client
+                    .storage
+                    .from('avatars')
+                    .remove([filePath]);
+
+                if (removeError) {
+                    console.error('Could not remove stored avatar:', removeError);
+                }
+            }
+        }
+
+        const preview = document.getElementById('profileAvatarPreview');
+        const fallback = document.getElementById('profileAvatarFallback');
+        const deleteButton = document.getElementById('profileAvatarDeleteButton');
+        const fileInput = document.getElementById('profileAvatarFile');
+
+        if (preview) {
+            preview.removeAttribute('src');
+            preview.style.display = 'none';
+        }
+
+        if (fallback) {
+            fallback.style.display = 'flex';
+        }
+
+        if (deleteButton) {
+            deleteButton.style.display = 'none';
+        }
+
+        if (fileInput) {
+            fileInput.value = '';
+        }
+
+        toast('Profile picture deleted!');
+    } catch (error) {
+        console.error('Could not delete profile picture:', error);
+        toast('Could not delete profile picture.');
+    }
+}
+
 // ===== ClickVibe Authentication =====
 
 let cvAuthMode = "user";
