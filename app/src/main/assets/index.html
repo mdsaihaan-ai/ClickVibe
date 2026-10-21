@@ -392,7 +392,7 @@ overflow-wrap: anywhere;
                             id="profileAvatarFallback"
                             class="avatar"
                             style="width:72px;height:72px;font-size:26px"
-                    >S</div>
+                    >👤</div>
                 </div>
 
                 <div>
@@ -1725,11 +1725,13 @@ try {
 
     const { data: profile, error: profileError } = await client
         .from('member_profiles')
-        .select('avatar_url')
+        .select('avatar_url, display_name')
+
         .eq('user_id', user.id)
         .maybeSingle();
 
     if (profileError) throw profileError;
+    fallback.textContent = (document.getElementById('profileName')?.value.trim() || 'Member').charAt(0).toUpperCase();
 
     const preview = document.getElementById('profileAvatarPreview');
     const fallback = document.getElementById('profileAvatarFallback');
@@ -1749,7 +1751,7 @@ if (profile?.avatar_url) {
 } else {
     preview.removeAttribute('src');
     preview.style.display = 'none';
-    fallback.style.display = 'flex';
+    fallback.style.display = 'grid';
 
     if (deleteButton) {
         deleteButton.style.display = 'none';
@@ -1788,9 +1790,9 @@ async function deleteProfileAvatar() {
 
         const { data: profile, error: profileError } = await client
             .from('member_profiles')
-            .select('avatar_url')
-            .eq('user_id', user.id)
-            .maybeSingle();
+.select('avatar_url, display_name')
+.eq('user_id', user.id)
+.maybeSingle();
 
         if (profileError) throw profileError;
 
@@ -1829,6 +1831,12 @@ async function deleteProfileAvatar() {
         const preview = document.getElementById('profileAvatarPreview');
         const fallback = document.getElementById('profileAvatarFallback');
         const deleteButton = document.getElementById('profileAvatarDeleteButton');
+        fallback.textContent = (
+    profile?.display_name ||
+    document.getElementById('profileName')?.value ||
+    document.getElementById('accountDisplayName')?.textContent ||
+    'S'
+).trim().charAt(0).toUpperCase();
         const fileInput = document.getElementById('profileAvatarFile');
 
         if (preview) {
@@ -1837,7 +1845,7 @@ async function deleteProfileAvatar() {
         }
 
         if (fallback) {
-            fallback.style.display = 'flex';
+            fallback.style.display = 'grid';
         }
 
         if (deleteButton) {
