@@ -142,7 +142,8 @@ margin-top: 22px;
 #authMessage {
 overflow-wrap: anywhere;
 }
-#deletePostDialog {
+#deletePostDialog,
+#deleteProfileAvatarDialog {
   width: calc(100% - 40px);
   max-width: 360px;
   padding: 24px;
@@ -153,16 +154,19 @@ overflow-wrap: anywhere;
   box-shadow: 0 20px 60px #0009;
 }
 
-#deletePostDialog::backdrop {
+#deletePostDialog::backdrop,
+#deleteProfileAvatarDialog::backdrop {
   background: rgba(0, 0, 0, 0.75);
 }
 
-#deletePostDialog h3 {
+#deletePostDialog h3,
+#deleteProfileAvatarDialog h3 {
   margin: 0 0 10px;
   font-size: 19px;
 }
 
-#deletePostDialog p {
+#deletePostDialog p,
+#deleteProfileAvatarDialog p {
   margin: 0 0 24px;
   color: #aab4c0;
   font-size: 13px;
@@ -433,7 +437,7 @@ overflow-wrap: anywhere;
                             id="profileAvatarDeleteButton"
                             class="btn"
                             type="button"
-                            onclick="deleteProfileAvatar()"
+                            onclick="document.getElementById('deleteProfileAvatarDialog').showModal()"
                             style="display:none"
                     >
                         Delete Picture
@@ -1218,6 +1222,26 @@ document.addEventListener('DOMContentLoaded', () => {
   cancelButton.addEventListener('click', closeDeleteCommentDialog);
   confirmButton.addEventListener('click', confirmDeleteComment);
 });
+document.addEventListener('DOMContentLoaded', () => {
+const dialog = document.getElementById('deleteProfileAvatarDialog');
+const cancelButton = document.getElementById('cancelDeleteProfileAvatar');
+const confirmButton = document.getElementById('confirmDeleteProfileAvatar');
+
+if (!dialog || !cancelButton || !confirmButton) {
+console.error('ClickVibe: Profile picture delete dialog elements not found.');
+return;
+}
+
+cancelButton.addEventListener('click', () => {
+dialog.close();
+});
+
+confirmButton.addEventListener('click', async () => {
+dialog.close();
+await deleteProfileAvatar();
+});
+});
+
 async function deletePost(id, confirmed = false) {
   const client = window.clickVibeSupabase;
   const post = posts.find(p => p.id === id);
@@ -2202,6 +2226,26 @@ cvInitAuth();
         <button
                 type="button"
                 id="confirmDeletePost"
+                class="delete-dialog-confirm">
+            Delete
+        </button>
+    </div>
+</dialog>
+<dialog id="deleteProfileAvatarDialog">
+    <h3>Delete your profile picture?</h3>
+    <p>This action cannot be undone.</p>
+
+    <div class="delete-dialog-actions">
+        <button
+                type="button"
+                id="cancelDeleteProfileAvatar"
+                class="delete-dialog-cancel">
+            Cancel
+        </button>
+
+        <button
+                type="button"
+                id="confirmDeleteProfileAvatar"
                 class="delete-dialog-confirm">
             Delete
         </button>
