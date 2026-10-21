@@ -487,7 +487,7 @@ function card(p,compact=false){return `<article class="card" data-post-id="${p.i
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
 <button onclick="toggleComments('${p.id}', this)">▤ ${(p.comments||[]).length} comments</button>${p.type==='Venture'?`<span>↻ ${p.updateCount||0} updates</span>`:''}</div><div id="comments-${p.id}" class="comment-section hidden">${(p.comments||[]).map(c=>`<div class="comment">${typeof c === 'string' ? '' : `<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="requestDeleteComment('${c.id}','${p.id}', this)">Delete</button>` : ''}${window.cvIsDeveloper === true ? ` <button class="btn small" onclick="editComment('${c.id}','${p.id}', this)">Edit</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}', this)">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
-function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile')render();}
+function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile'){render();loadProfileAvatar();}}
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
 async function loadCommunityPosts() {
   const client = window.clickVibeSupabase;
@@ -1574,6 +1574,135 @@ function previewProfileAvatar(event) {
     preview.style.display = 'block';
     fallback.style.display = 'none';
 }
+async function uploadProfileAvatar() {
+toast('loadProfileAvatar started');
+    const client = window.clickVibeSupabase;
+    const input = document.getElementById('profileAvatarFile');
+    const file = input?.files?.[0];
+
+    if (!client) {
+        toast('Supabase connection unavailable.');
+        return;
+    }
+
+    if (!file) {
+        toast('Choose a picture first.');
+        return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+        toast('Image must be smaller than 2 MB.');
+        return;
+    }
+
+    const { data: sessionData, error: sessionError } =
+        await client.auth.getSession();
+
+    if (sessionError || !sessionData.session?.user) {
+        toast('Please sign in again.');
+        return;
+    }
+
+    const user = sessionData.session.user;
+    const extension = file.name.split('.').pop().toLowerCase();
+    const filePath = `${user.id}/avatar-${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await client.storage
+        .from('avatars')
+        .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: file.type
+        });
+
+    if (uploadError) {
+        console.error('Avatar upload failed:', uploadError);
+        toast('Upload failed: ' + uploadError.message);
+        return;
+    }
+
+    const { data: publicData } = client.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+    const avatarUrl = publicData.publicUrl;
+
+    const { error: profileError } = await client
+        .from('member_profiles')
+        .upsert({
+            user_id: user.id,
+            display_name:
+                document.getElementById('profileName').value.trim() || 'Member',
+            bio: document.getElementById('profileBio').value.trim(),
+            avatar_url: avatarUrl,
+            updated_at: new Date().toISOString()
+        }, {
+            onConflict: 'user_id'
+        });
+
+    if (profileError) {
+        console.error('Profile save failed:', profileError);
+        toast(
+            'Image uploaded, but profile saving failed: ' +
+            profileError.message
+        );
+        return;
+    }
+
+    const preview = document.getElementById('profileAvatarPreview');
+    const fallback = document.getElementById('profileAvatarFallback');
+
+    if (preview && fallback) {
+        preview.src = avatarUrl;
+        preview.style.display = 'block';
+        fallback.style.display = 'none';
+    }
+
+    toast('Profile picture saved!');
+}
+async function loadProfileAvatar() {
+const client = window.clickVibeSupabase;
+
+if (!client) return;
+
+try {
+    const { data: sessionData, error: sessionError } =
+        await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+    if (!user) return;
+
+    const { data: profile, error: profileError } = await client
+        .from('member_profiles')
+        .select('avatar_url')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    if (profileError) throw profileError;
+
+    const preview = document.getElementById('profileAvatarPreview');
+    const fallback = document.getElementById('profileAvatarFallback');
+
+    if (!preview || !fallback) return;
+
+    if (profile?.avatar_url) {
+        preview.src = profile.avatar_url;
+        preview.style.display = 'block';
+        fallback.style.display = 'none';
+    } else {
+        preview.removeAttribute('src');
+        preview.style.display = 'none';
+        fallback.style.display = 'flex';
+    }
+} catch (error) {
+    console.error('Could not load profile picture:', error);
+}
+
+
+}
+
 let toastTimer;function toast(msg){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.remove(),2200)}
 document.querySelectorAll('#feedFilters .chip').forEach(c=>c.addEventListener('click',()=>{filter=c.dataset.filter;document.querySelectorAll('#feedFilters .chip').forEach(x=>x.classList.toggle('active',x===c));render()}));try{const profile=JSON.parse(localStorage.getItem('cv_profile'));if(profile){$('profileName').value=profile.name||'Saihaan';$('profileBio').value=profile.bio||''}}catch(e){}render();
 // ===== ClickVibe Authentication =====
