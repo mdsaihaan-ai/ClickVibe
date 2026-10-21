@@ -378,9 +378,27 @@ overflow-wrap: anywhere;
 
         <div class="formcard">
             <div class="cardtop">
-                <div class="avatar">S</div>
+                <div style="text-align:center">
+                    <img
+                            id="profileAvatarPreview"
+                            class="avatar"
+                            src=""
+                            alt="Profile picture"
+                            style="width:72px;height:72px;border-radius:50%;object-fit:cover;display:none"
+                    >
+
+
+                    <div
+                            id="profileAvatarFallback"
+                            class="avatar"
+                            style="width:72px;height:72px;font-size:26px"
+                    >S</div>
+                </div>
+
                 <div>
                     <div class="author" id="accountDisplayName">Saihaan</div>
+
+
                     <div class="muted" id="accountEmail" style="font-size:12px">
                         Checking account…
                     </div>
@@ -389,6 +407,26 @@ overflow-wrap: anywhere;
                     </div>
                 </div>
             </div>
+
+            <div class="field">
+                <label>Profile picture</label>
+                <input
+                        id="profileAvatarFile"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onchange="previewProfileAvatar(event)"
+                >
+                <div class="muted" style="font-size:12px;margin-top:6px">
+                    Choose a JPG, PNG, or WebP image (max 2 MB).
+                </div>
+            </div>
+            <button
+                    class="btn primary"
+                    type="button"
+                    onclick="uploadProfileAvatar()"
+            >
+                Save profile picture
+            </button>
 
             <div class="field">
                 <label>Display name</label>
@@ -1509,6 +1547,33 @@ async function confirmDeleteBacking() {
   }
 }
 function saveProfile(){try{localStorage.setItem('cv_profile',JSON.stringify({name:$('profileName').value,bio:$('profileBio').value}))}catch(e){}toast('Profile saved on this device.');render()}
+function previewProfileAvatar(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        toast('Please select an image.');
+        return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+        toast('Image must be smaller than 2 MB.');
+        event.target.value = '';
+        return;
+    }
+
+    const preview = document.getElementById('profileAvatarPreview');
+    const fallback = document.getElementById('profileAvatarFallback');
+
+    if (!preview || !fallback) {
+        toast('Avatar preview elements not found.');
+        return;
+    }
+
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    fallback.style.display = 'none';
+}
 let toastTimer;function toast(msg){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.remove(),2200)}
 document.querySelectorAll('#feedFilters .chip').forEach(c=>c.addEventListener('click',()=>{filter=c.dataset.filter;document.querySelectorAll('#feedFilters .chip').forEach(x=>x.classList.toggle('active',x===c));render()}));try{const profile=JSON.parse(localStorage.getItem('cv_profile'));if(profile){$('profileName').value=profile.name||'Saihaan';$('profileBio').value=profile.bio||''}}catch(e){}render();
 // ===== ClickVibe Authentication =====

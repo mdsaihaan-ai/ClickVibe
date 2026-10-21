@@ -19,8 +19,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.community.clickvibe.ui.theme.ClickVibeTheme
 import android.webkit.WebChromeClient
+import android.webkit.ValueCallback
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : ComponentActivity() {
+    private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+    private val filePickerLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            val selectedFile =
+                if (result.resultCode == RESULT_OK) {
+                    result.data?.data?.let { arrayOf(it) }
+                } else {
+                    null
+                }
+
+            fileUploadCallback?.onReceiveValue(selectedFile)
+            fileUploadCallback = null
+        }
 
     private var webView: WebView? = null
     private var pendingOAuthCallback: String? = null
@@ -47,7 +64,28 @@ class MainActivity : ComponentActivity() {
                             visibility = View.INVISIBLE
                             webView = this
 
-                            webChromeClient = WebChromeClient()
+                            webChromeClient = object : WebChromeClient() {
+                                override fun onShowFileChooser(
+                                    webView: WebView?,
+                                    filePathCallback: ValueCallback<Array<Uri>>?,
+                                    fileChooserParams: FileChooserParams?
+                                ): Boolean {
+                                    this@MainActivity.fileUploadCallback?.onReceiveValue(null)
+                                    this@MainActivity.fileUploadCallback = filePathCallback
+
+
+                                    val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                                        addCategory(Intent.CATEGORY_OPENABLE)
+                                        type = "image/*"
+                                    }
+
+                                    filePickerLauncher.launch(intent)
+                                    return true
+                                }
+
+
+                            }
+
 
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
