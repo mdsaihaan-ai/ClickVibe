@@ -1707,6 +1707,7 @@ async function uploadProfileAvatar() {
 if (deleteButton) {
     deleteButton.style.display = 'inline-block';
 }
+    await loadCommunityPosts();
     toast('Profile picture saved!');
 }
 async function loadProfileAvatar() {
@@ -1731,7 +1732,6 @@ try {
         .maybeSingle();
 
     if (profileError) throw profileError;
-    fallback.textContent = (document.getElementById('profileName')?.value.trim() || 'Member').charAt(0).toUpperCase();
 
     const preview = document.getElementById('profileAvatarPreview');
     const fallback = document.getElementById('profileAvatarFallback');
@@ -1856,6 +1856,7 @@ async function deleteProfileAvatar() {
             fileInput.value = '';
         }
 
+        await loadCommunityPosts();
         toast('Profile picture deleted!');
     } catch (error) {
         console.error('Could not delete profile picture:', error);
