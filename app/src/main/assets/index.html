@@ -561,17 +561,18 @@ async function loadCommunityPosts() {
 
 if (commentsError) throw commentsError;
 const { data: profiles, error: profilesError } = await client
-    .from('member_profiles')
-    .select('user_id, avatar_url');
+.from('member_profiles')
+.select('user_id, display_name, avatar_url');
 
 if (profilesError) throw profilesError;
 
 const profileByUserId = new Map(
-    (profiles || []).map(profile => [
-        profile.user_id,
-        profile.avatar_url
-    ])
+(profiles || []).map(profile => [
+profile.user_id,
+profile
+])
 );
+
 
     posts = (rows || []).map(row => {
       const postLikes = (likes || []).filter(
@@ -586,15 +587,15 @@ const profileByUserId = new Map(
         body: row.body,
         status: row.status,
         category: row.category,
-        author: row.author_name,
-        avatar_url: profileByUserId.get(row.author_id) || null,
+        author: profileByUserId.get(row.author_id)?.display_name || row.author_name,
+        avatar_url: profileByUserId.get(row.author_id)?.avatar_url || null,
         time: new Date(row.created_at).toLocaleString(),
         comments: (savedComments || [])
   .filter(comment => comment.post_id === row.id)
   .map(comment => ({
     id: comment.id,
-    author: comment.author_name,
-    avatar_url: profileByUserId.get(comment.user_id) || null,
+    author: profileByUserId.get(comment.user_id)?.display_name || comment.author_name,
+    avatar_url: profileByUserId.get(comment.user_id)?.avatar_url || null,
     body: comment.body,
     user_id: comment.user_id,
     created_at: comment.created_at
@@ -635,16 +636,30 @@ async function loadBackingRequests() {
 
     if (error) throw error;
 
-    backing = (rows || []).map(row => ({
-      id: row.id,
-      name: row.venture_name,
-      need: row.resources,
-      why: row.reason,
-      author: row.author,
-      created_by: row.created_by,
-      created_at: row.created_at,
-      updated_at: row.updated_at
-    }));
+const { data: profiles, error: profilesError } = await client
+.from('member_profiles')
+.select('user_id, display_name');
+
+if (profilesError) throw profilesError;
+
+const usernameByUserId = new Map(
+(profiles || []).map(profile => [
+profile.user_id,
+profile.display_name
+])
+);
+
+backing = (rows || []).map(row => ({
+id: row.id,
+name: row.venture_name,
+need: row.resources,
+why: row.reason,
+author: usernameByUserId.get(row.created_by) || row.author,
+created_by: row.created_by,
+created_at: row.created_at,
+updated_at: row.updated_at
+}));
+
 
     render();
 
@@ -781,11 +796,10 @@ async function createPost() {
     }
 
     const authorName = (
-      user.user_metadata?.full_name ||
-      user.user_metadata?.name ||
-      user.email?.split('@')[0] ||
-      'Member'
-    ).trim();
+$('profileName').value.trim() ||
+user.email?.split('@')[0] ||
+'Member'
+);
 
     // Update an existing post when edit mode is active.
 if (editingPostId !== null) {
@@ -1337,11 +1351,10 @@ async function commentPost(id, button) {
     }
 
     const authorName = (
-      user.user_metadata?.full_name ||
-      user.user_metadata?.name ||
-      user.email?.split('@')[0] ||
-      'Member'
-    ).trim();
+$('profileName').value.trim() ||
+user.email?.split('@')[0] ||
+'Member'
+);
 
     const { data, error } = await client
       .from('community_comments')
@@ -1619,7 +1632,90 @@ async function confirmDeleteBacking() {
     if (deleteButton) deleteButton.disabled = false;
   }
 }
-function saveProfile(){try{localStorage.setItem('cv_profile',JSON.stringify({name:$('profileName').value,bio:$('profileBio').value}))}catch(e){}toast('Profile saved on this device.');render()}
+async function saveProfile() {
+    const client = window.clickVibeSupabase;
+    const username = $('profileName').value.trim();
+    const bio = $('profileBio').value.trim();
+
+    if (!client) {
+        toast('Connection unavailable.');
+        return;
+    }
+
+    if (!username) {
+        toast('Username cannot be empty.');
+        return;
+    }
+
+    if (username.length > 30) {
+        toast('Username must be 30 characters or fewer.');
+        return;
+    }
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            toast('Please sign in again.');
+            return;
+        }
+
+        const { data: existingProfile, error: profileError } =
+            await client
+                .from('member_profiles')
+                .select('avatar_url')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        const { error: saveError } = await client
+            .from('member_profiles')
+            .upsert({
+                user_id: user.id,
+                display_name: username,
+                bio: bio,
+                avatar_url: existingProfile?.avatar_url ?? null,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'user_id'
+            });
+
+        if (saveError) {
+            if (saveError.code === '23505') {
+                toast('That username is already taken. Choose another.');
+                return;
+            }
+
+            throw saveError;
+        }
+
+        localStorage.setItem('cv_profile', JSON.stringify({
+            name: username,
+            bio: bio
+        }));
+
+        const accountName = document.getElementById('accountDisplayName');
+
+        if (accountName) {
+            accountName.textContent = username;
+        }
+
+        toast('Profile saved to your account!');
+        await loadCommunityPosts();
+        await loadBackingRequests();
+        render();
+
+    } catch (error) {
+        console.error('Profile save failed:', error);
+        toast('Could not save profile: ' + error.message);
+    }
+}
 function previewProfileAvatar(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -2036,21 +2132,42 @@ async function cvFinishLogin(user) {
 document.querySelector(".app").classList.add("hidden");
 document.getElementById("communityLoading").classList.remove("hidden");
 
-  const name =
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    user.email?.split("@")[0] ||
-    "Member";
+  const defaultUsername = user.email?.split("@")[0] || "Member";
+let savedProfile = null;
 
-  const profileName = document.getElementById("profileName");
-  if (profileName) {
+try {
+    const { data, error } = await client
+        .from('member_profiles')
+        .select('display_name, bio')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    if (error) throw error;
+
+    savedProfile = data;
+} catch (error) {
+    console.error('Could not load saved profile:', error);
+}
+
+const name = savedProfile?.display_name?.trim() || defaultUsername;
+
+const profileName = document.getElementById("profileName");
+
+if (profileName) {
     profileName.value = name;
-  }
+}
 
-  const displayName = document.getElementById("accountDisplayName");
-  if (displayName) {
+const profileBio = document.getElementById("profileBio");
+
+if (profileBio && savedProfile) {
+    profileBio.value = savedProfile.bio || "";
+}
+
+const displayName = document.getElementById("accountDisplayName");
+
+if (displayName) {
     displayName.textContent = name;
-  }
+}
 
   const emailElement = document.getElementById("accountEmail");
   if (emailElement) {
