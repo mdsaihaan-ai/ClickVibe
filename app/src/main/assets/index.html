@@ -447,6 +447,113 @@ flex: 1;
 <section id="ideasView" class="hidden"><div class="eyebrow">Think out loud</div><div class="sectionhead"><h2>Ideas</h2><button class="btn small primary" onclick="openCreate('Idea')">＋ New idea</button></div><p class="muted">What should exist? Who needs it? How could it work?</p><div id="ideasList"></div></section>
 <section id="venturesView" class="hidden"><div class="eyebrow">Execution & evidence</div><div class="sectionhead"><h2>Ventures</h2><button class="btn small primary" onclick="openCreate('Venture')">＋ New venture</button></div><p class="muted">Follow the work, experiments and outcomes—not just the pitch.</p><div id="venturesList"></div></section>
 <section id="backingView" class="hidden"><div class="eyebrow">Capital & resources</div><div class="sectionhead"><h2>Backing board</h2></div><div class="notice">Prototype only. This board records discussion and resource needs; it does not accept money, offer securities or arrange investments.</div><div id="backingList"></div><div class="formcard"><h3 style="margin-top:0">What does your venture need?</h3><div class="field"><label>Venture name</label><input id="backName" placeholder="e.g. Local Food Guide"></div><div class="field"><label>Resource needed</label><select id="backNeed"><option>Feedback</option><option>Distribution</option><option>Equipment</option><option>Funding discussion</option><option>Skills / collaborator</option></select></div><div class="field"><label>Why it matters</label><textarea id="backWhy" placeholder="What will this resource help you test or achieve?"></textarea></div><button class="btn primary" onclick="submitBacking()">Post resource request</button></div></section>
+    <section id="backingDetailView" class="hidden">
+        <button class="btn" onclick="navigate('backing')">
+            ← Back to Backing Board
+        </button>
+
+        <div class="hero" style="margin-top:18px">
+            <div class="eyebrow">Venture overview</div>
+
+            <h1 id="backingDetailName">Venture</h1>
+
+            <p id="backingDetailDescription">
+                Explore this venture and its goals.
+            </p>
+        </div>
+
+        <div class="sectionhead">
+            <h2>Backing overview</h2>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <b id="backingDetailTotal">₹0</b>
+                <span>Total investments</span>
+            </div>
+
+            <div class="stat">
+                <b id="backingDetailMinimum">₹0</b>
+                <span>Minimum investment</span>
+            </div>
+
+            <div class="stat">
+                <b id="backingDetailStatus">Planned</b>
+                <span>Venture status</span>
+            </div>
+        </div>
+
+        <div class="formcard">
+            <h3>Become part of the conversation</h3>
+
+            <p class="muted">
+                Back this venture to access its private investor
+                conversation and follow its progress.
+            </p>
+
+            <button
+                    class="btn primary"
+                    style="width:100%;margin-top:12px"
+                    onclick="openBackingInvestment()"
+            >
+                View investment options →
+            </button>
+        </div>
+    </section>
+    <section id="backingInvestmentView" class="hidden">
+        <button class="btn" onclick="navigate('backingDetail')">
+            ← Back to venture
+        </button>
+
+
+        <div class="hero" style="margin-top:18px">
+            <div class="eyebrow">Venture participation</div>
+            <h1 id="investmentVentureName">Investment options</h1>
+            <p>Choose an amount to explore how participation in this venture could work.</p>
+        </div>
+
+        <div class="notice">
+            <strong>TEST MODE</strong><br>
+            This is a private prototype. No real payment will be collected or processed.
+        </div>
+
+        <div class="formcard">
+            <h3>Select an amount</h3>
+
+            <div class="field">
+                <label for="backingInvestmentAmount">Amount (₹)</label>
+                <input
+                        id="backingInvestmentAmount"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="Enter an amount"
+                >
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+                <button class="btn small" onclick="$('backingInvestmentAmount').value=500">₹500</button>
+                <button class="btn small" onclick="$('backingInvestmentAmount').value=1000">₹1,000</button>
+                <button class="btn small" onclick="$('backingInvestmentAmount').value=5000">₹5,000</button>
+                <button class="btn small" onclick="$('backingInvestmentAmount').value=10000">₹10,000</button>
+            </div>
+
+            <button
+                    class="btn primary"
+                    style="width:100%;margin-top:18px"
+                    onclick="simulateBackingInvestment()"
+            >
+                Continue in test mode →
+            </button>
+
+            <p class="muted" style="font-size:12px;margin-top:12px">
+                These options are for interface testing only. Selecting an amount does not create an investment.
+            </p>
+        </div>
+
+
+    </section>
+
     <section id="profileView" class="hidden">
         <div class="eyebrow">Your workspace</div>
 
@@ -597,8 +704,84 @@ ${p.bio ? `<div class="muted" style="font-size:12px;margin-top:3px;">${esc(p.bio
     ? `<img src="${esc(c.avatar_url)}" alt="" style="width:24px;height:24px;object-fit:cover;border-radius:50%;vertical-align:middle;margin-right:6px;">`
     : `<span style="display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#2a3542;font-size:10px;margin-right:6px;">${esc((c.author || 'M').charAt(0).toUpperCase())}</span>`
 }<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="requestDeleteComment('${c.id}','${p.id}', this)">Delete</button>` : ''}${window.cvIsDeveloper === true ? ` <button class="btn small" onclick="editComment('${c.id}','${p.id}', this)">Edit</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}', this)">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
-function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
-function navigate(view){['home','ideas','ventures','backing','profile','create'].forEach(v=>$(v+'View').classList.toggle('hidden',v!==view));document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('homeView').scrollIntoView({block:'start',behavior:'smooth'});if(view==='profile'){render();loadProfileAvatar();}}
+function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p><div class="cardmeta"><button class="btn small" onclick="openBackingDetail('${b.id}')">View venture →</button></div>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
+function navigate(view){
+    [
+    'home',
+    'ideas',
+    'ventures',
+    'backing',
+    'backingDetail',
+    'backingInvestment',
+    'profile',
+    'create'
+].forEach(v=>{
+        $(v+'View').classList.toggle('hidden',v!==view);
+    });
+
+    document.querySelectorAll('.nav').forEach(n=>{
+        n.classList.toggle('active',n.dataset.view===view);
+    });
+
+    if(view==='profile'){
+        render();
+        loadProfileAvatar();
+    }
+
+    window.scrollTo({
+        top:0,
+        behavior:'smooth'
+    });
+}
+function openBackingDetail(id){
+const item = backing.find(b => String(b.id) === String(id));
+
+
+if(!item){
+    if(typeof toast === 'function'){
+        toast('Venture not found.');
+    }
+    return;
+}
+
+$('backingDetailName').textContent = item.name || 'Untitled venture';
+$('backingDetailDescription').textContent = item.why || 'No description available yet.';
+$('backingDetailTotal').textContent = '₹0';
+$('backingDetailMinimum').textContent = 'To be determined';
+$('backingDetailStatus').textContent = 'Prototype';
+
+navigate('backingDetail');
+}
+function openBackingInvestment(){
+const name = $('backingDetailName').textContent;
+
+
+$('investmentVentureName').textContent = name;
+$('backingInvestmentAmount').value = '';
+
+navigate('backingInvestment');
+
+
+}
+function simulateBackingInvestment(){
+const amountInput = $('backingInvestmentAmount');
+const amount = Number(amountInput.value);
+
+
+if(!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)){
+    if(typeof toast === 'function'){
+        toast('Enter a valid whole amount.');
+    }
+    return;
+}
+
+if(typeof toast === 'function'){
+    toast('Test mode only — no payment has been made.');
+}
+
+
+}
+
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
 async function loadCommunityPosts() {
   const client = window.clickVibeSupabase;
