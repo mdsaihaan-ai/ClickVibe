@@ -517,7 +517,9 @@ function card(p,compact=false){return `<article class="card" data-post-id="${p.i
 ) ? `
   ${window.cvIsDeveloper === true ? `<button class="btn small" onclick="editPost('${p.id}')">Edit</button>` : ''}
   <button class="btn small" onclick="deletePost('${p.id}')">Delete</button>
-` : ''}<div><div class="author">${esc(p.author)}</div><div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
+` : ''}<div><div class="author">${esc(p.author)}</div>
+${p.bio ? `<div class="muted" style="font-size:12px;margin-top:3px;">${esc(p.bio)}</div>` : ''}
+<div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
   class="${p.supportedByMe ? 'supported' : ''}"
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
@@ -562,7 +564,8 @@ async function loadCommunityPosts() {
 if (commentsError) throw commentsError;
 const { data: profiles, error: profilesError } = await client
 .from('member_profiles')
-.select('user_id, display_name, avatar_url');
+.select('user_id, display_name, bio, avatar_url');
+
 
 if (profilesError) throw profilesError;
 
@@ -588,6 +591,7 @@ profile
         status: row.status,
         category: row.category,
         author: profileByUserId.get(row.author_id)?.display_name || row.author_name,
+        bio: profileByUserId.get(row.author_id)?.bio || '',
         avatar_url: profileByUserId.get(row.author_id)?.avatar_url || null,
         time: new Date(row.created_at).toLocaleString(),
         comments: (savedComments || [])
