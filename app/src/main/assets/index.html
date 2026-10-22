@@ -306,6 +306,76 @@ overflow-wrap: anywhere;
   border-color: #a93636;
   color: #fff;
 }
+#avatarCropDialog {
+width: calc(100% - 40px);
+max-width: 380px;
+padding: 24px;
+border: 1px solid #35414e;
+border-radius: 20px;
+background: linear-gradient(145deg, #171d25, #11151b);
+color: #f1f4f8;
+box-shadow: 0 20px 60px #0009;
+}
+
+#avatarCropDialog::backdrop {
+background: rgba(0, 0, 0, 0.78);
+backdrop-filter: blur(5px);
+}
+
+#avatarCropDialog h3 {
+margin: 0 0 5px;
+font-size: 20px;
+}
+
+#avatarCropDialog p {
+margin: 0 0 18px;
+font-size: 12px;
+}
+
+#avatarCropStage {
+position: relative;
+width: 100%;
+aspect-ratio: 1 / 1;
+overflow: hidden;
+border-radius: 12px;
+background: #080a0e;
+touch-action: none;
+margin-bottom: 18px;
+}
+
+#avatarCropImage {
+position: absolute;
+max-width: none;
+max-height: none;
+user-select: none;
+-webkit-user-drag: none;
+pointer-events: none;
+}
+
+#avatarCropCircle {
+position: absolute;
+inset: 0;
+border-radius: 50%;
+border: 2px solid #e1e7ee;
+box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.48);
+pointer-events: none;
+}
+
+#avatarCropZoom {
+display: block;
+width: 100%;
+margin: 8px 0 20px;
+accent-color: #c8d1dc;
+}
+
+#avatarCropDialog .delete-dialog-actions {
+margin-top: 8px;
+}
+
+#avatarCropDialog .delete-dialog-actions button {
+flex: 1;
+}
+
 </style></head>
 
 <body>
@@ -1741,6 +1811,7 @@ function previewProfileAvatar(event) {
 
     if (!file.type.startsWith('image/')) {
         toast('Please select an image.');
+        event.target.value = '';
         return;
     }
 
@@ -1750,22 +1821,212 @@ function previewProfileAvatar(event) {
         return;
     }
 
-    const preview = document.getElementById('profileAvatarPreview');
-    const fallback = document.getElementById('profileAvatarFallback');
+    const dialog = document.getElementById('avatarCropDialog');
+    const stage = document.getElementById('avatarCropStage');
+    const image = document.getElementById('avatarCropImage');
 
-    if (!preview || !fallback) {
-        toast('Avatar preview elements not found.');
+    if (!dialog || !stage || !image) {
+        toast('Photo crop window could not be opened.');
         return;
     }
 
-    preview.src = URL.createObjectURL(file);
-    preview.style.display = 'block';
-    fallback.style.display = 'none';
+    const imageUrl = URL.createObjectURL(file);
+
+    image.onload = function () {
+        if (!dialog.open) {
+            dialog.showModal();
+        }
+
+        requestAnimationFrame(function () {
+            const stageSize = stage.clientWidth;
+
+            if (!stageSize) {
+                URL.revokeObjectURL(imageUrl);
+                toast('Could not prepare the crop window.');
+                dialog.close();
+                return;
+            }
+
+            const scale = Math.max(
+                stageSize / image.naturalWidth,
+                stageSize / image.naturalHeight
+            );
+
+            const width = image.naturalWidth * scale;
+            const height = image.naturalHeight * scale;
+
+            image.style.width = width + 'px';
+            image.style.height = height + 'px';
+            image.style.left = (stageSize - width) / 2 + 'px';
+            image.style.top = (stageSize - height) / 2 + 'px';
+
+            window.cvAvatarCropState = {
+                file: file,
+                imageUrl: imageUrl,
+                baseWidth: width,
+                baseHeight: height,
+                left: (stageSize - width) / 2,
+                top: (stageSize - height) / 2,
+                stageSize: stageSize
+            };
+        });
+    };
+
+    image.onerror = function () {
+        URL.revokeObjectURL(imageUrl);
+        toast('Could not load that image. Please try another.');
+        event.target.value = '';
+    };
+
+    image.src = imageUrl;
+
+
+let dragging = false;
+let startX = 0;
+let startY = 0;
+let startLeft = 0;
+let startTop = 0;
+
+stage.onpointerdown = function (e) {
+    const state = window.cvAvatarCropState;
+    if (!state) return;
+
+    dragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startLeft = parseFloat(image.style.left);
+    startTop = parseFloat(image.style.top);
+
+    stage.setPointerCapture(e.pointerId);
+};
+
+stage.onpointermove = function (e) {
+    if (!dragging) return;
+
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    image.style.left = (startLeft + dx) + 'px';
+    image.style.top = (startTop + dy) + 'px';
+};
+
+stage.onpointerup = function () {
+    dragging = false;
+};
+
+stage.onpointercancel = function () {
+    dragging = false;
+};
+
+
+    const zoom = document.getElementById('avatarCropZoom');
+
+    zoom.value = '1';
+
+    zoom.oninput = function () {
+        const state = window.cvAvatarCropState;
+        if (!state) return;
+
+        const stageSize = state.stageSize;
+        const zoomFactor = Number(zoom.value);
+
+        const width = state.baseWidth * zoomFactor;
+        const height = state.baseHeight * zoomFactor;
+
+        const centerX = stageSize / 2;
+        const centerY = stageSize / 2;
+
+        const oldWidth = parseFloat(image.style.width);
+        const oldHeight = parseFloat(image.style.height);
+        const oldLeft = parseFloat(image.style.left);
+        const oldTop = parseFloat(image.style.top);
+
+        const imageCenterX = oldLeft + oldWidth / 2;
+        const imageCenterY = oldTop + oldHeight / 2;
+
+        const ratio = width / oldWidth;
+
+        const left = centerX + (imageCenterX - centerX) * ratio - width / 2;
+        const top = centerY + (imageCenterY - centerY) * ratio - height / 2;
+
+        image.style.width = width + 'px';
+        image.style.height = height + 'px';
+        image.style.left = left + 'px';
+        image.style.top = top + 'px';
+    };
 }
+function confirmAvatarCrop() {
+
+const dialog = document.getElementById('avatarCropDialog');
+const stage = document.getElementById('avatarCropStage');
+const image = document.getElementById('avatarCropImage');
+const state = window.cvAvatarCropState;
+
+if (!state || !image.naturalWidth) {
+    toast('Please select a photo first.');
+    return;
+}
+
+const size = 512;
+const stageSize = stage.clientWidth;
+
+const imageWidth = parseFloat(image.style.width);
+const imageHeight = parseFloat(image.style.height);
+const imageLeft = parseFloat(image.style.left);
+const imageTop = parseFloat(image.style.top);
+
+const sourceX = (0 - imageLeft) / imageWidth * image.naturalWidth;
+const sourceY = (0 - imageTop) / imageHeight * image.naturalHeight;
+const sourceSize = stageSize / imageWidth * image.naturalWidth;
+
+const canvas = document.createElement('canvas');
+canvas.width = size;
+canvas.height = size;
+
+const context = canvas.getContext('2d');
+
+context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    size,
+    size
+);
+
+canvas.toBlob(function (blob) {
+    if (!blob) {
+        toast('Could not crop this photo. Please try again.');
+        return;
+    }
+
+    window.cvCroppedAvatarFile = new File(
+        [blob],
+        'profile-picture.jpg',
+        { type: 'image/jpeg' }
+    );
+
+    const preview = document.getElementById('profileAvatarPreview');
+
+    if (preview) {
+        preview.src = URL.createObjectURL(blob);
+        preview.style.display = 'block';
+    }
+
+    dialog.close();
+    toast('Photo cropped successfully.');
+}, 'image/jpeg', 0.9);
+
+
+}
+
 async function uploadProfileAvatar() {
     const client = window.clickVibeSupabase;
     const input = document.getElementById('profileAvatarFile');
-    const file = input?.files?.[0];
+    const file = window.cvCroppedAvatarFile || input?.files?.[0];
 
     if (!client) {
         toast('Supabase connection unavailable.');
@@ -2486,4 +2747,51 @@ cvInitAuth();
                 onclick="confirmDeleteBacking()">Delete</button>
     </div>
 </dialog>
+<dialog id="avatarCropDialog">
+    <h3>Adjust profile picture</h3>
+    <p class="muted">Position your face inside the circle.</p>
+
+
+    <div id="avatarCropStage">
+        <img id="avatarCropImage" alt="Crop preview">
+        <div id="avatarCropCircle"></div>
+    </div>
+
+    <label for="avatarCropZoom" class="muted">Zoom</label>
+    <input id="avatarCropZoom" type="range" min="1" max="3" step="0.05" value="1">
+
+    <div class="delete-dialog-actions">
+        <button
+                type="button"
+                id="cancelAvatarCrop"
+                class="delete-dialog-cancel"
+                onclick="document.getElementById('avatarCropDialog').close()"
+
+        >
+
+
+            Cancel
+
+
+        </button>
+
+        <button
+                type="button"
+                id="confirmAvatarCrop"
+                class="btn primary"
+                onclick="confirmAvatarCrop()"
+
+        >
+
+
+            Use photo
+
+
+        </button>
+
+    </div>
+
+
+</dialog>
+
 </body></html>
