@@ -697,6 +697,21 @@ function subscribeCommunityRealtime() {
       },
       () => loadCommunityPosts()
     )
+
+.on(
+  'postgres_changes',
+  {
+    event: '*',
+    schema: 'public',
+    table: 'member_profiles'
+  },
+  () => {
+    loadCommunityPosts();
+    loadBackingRequests();
+  }
+)
+
+
     .on(
       'postgres_changes',
       {
