@@ -547,7 +547,8 @@ flex: 1;
             </button>
 
             <p class="muted" style="font-size:12px;margin-top:12px">
-                These options are for interface testing only. Selecting an amount does not create an investment.
+                This creates a proposed test investment only. No payment is made, and the proposal is not yet verified.
+
             </p>
         </div>
 
@@ -662,6 +663,32 @@ flex: 1;
         </div>
 
         <div id="myActivity"></div>
+        <div class="sectionhead" style="margin-top:24px">
+            <h2>My Investments</h2>
+        </div>
+
+        <div class="formcard">
+            <p class="muted" style="font-size:13px;margin-top:0">
+                Track your venture proposals, contributions, and investment status.
+            </p>
+
+
+            <div id="myInvestmentsList">
+                <div class="muted">Your investments will appear here.</div>
+            </div>
+
+            <button
+                    class="btn"
+                    type="button"
+                    onclick="loadMyInvestments()"
+                    style="width:100%;margin-top:14px"
+            >
+                Refresh Investments
+            </button>
+
+
+        </div>
+
 
         <div class="notice">
             Your account is authenticated through ClickVibe. Profile and community content will be connected to the shared database as development continues.
@@ -724,9 +751,11 @@ function navigate(view){
     });
 
     if(view==='profile'){
-        render();
-        loadProfileAvatar();
-    }
+render();
+loadProfileAvatar();
+loadMyInvestments();
+}
+
 
     window.scrollTo({
         top:0,
@@ -743,6 +772,7 @@ if(!item){
     }
     return;
 }
+window.cvCurrentBackingVentureId = item.id;
 
 $('backingDetailName').textContent = item.name || 'Untitled venture';
 $('backingDetailDescription').textContent = item.why || 'No description available yet.';
@@ -763,24 +793,62 @@ navigate('backingInvestment');
 
 
 }
-function simulateBackingInvestment(){
+async function simulateBackingInvestment() {
+const client = window.clickVibeSupabase;
 const amountInput = $('backingInvestmentAmount');
 const amount = Number(amountInput.value);
+const ventureId = window.cvCurrentBackingVentureId;
 
 
-if(!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)){
-    if(typeof toast === 'function'){
-        toast('Enter a valid whole amount.');
-    }
+if (!client) {
+    toast('Database connection unavailable.');
     return;
 }
 
-if(typeof toast === 'function'){
-    toast('Test mode only — no payment has been made.');
+if (!ventureId) {
+    toast('Please select a venture first.');
+    return;
+}
+
+if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
+    toast('Enter a valid whole amount.');
+    return;
+}
+
+try {
+    const { data: sessionData, error: sessionError } =
+        await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+        toast('Please sign in first.');
+        return;
+    }
+
+    const { error: insertError } = await client
+        .from('venture_investments')
+        .insert({
+            venture_id: ventureId,
+            investor_id: user.id,
+            amount: amount,
+            status: 'proposed',
+            is_test: true
+        });
+
+    if (insertError) throw insertError;
+
+    toast('Test proposal saved! No payment was made.');
+} catch (error) {
+    console.error('Could not save investment proposal:', error);
+    toast('Could not save proposal. Please try again.');
 }
 
 
 }
+
 
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
 async function loadCommunityPosts() {
@@ -934,6 +1002,84 @@ updated_at: row.updated_at
     toast('Could not load backing requests. Check the connection.');
   }
 }
+async function loadMyInvestments() {
+const client = window.clickVibeSupabase;
+const container = $('myInvestmentsList');
+
+
+if (!client) {
+    container.innerHTML = '<div class="muted">Database connection unavailable.</div>';
+    return;
+}
+
+container.innerHTML = '<div class="muted">Loading investments...</div>';
+
+try {
+    const { data: sessionData, error: sessionError } =
+        await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+        container.innerHTML = '<div class="muted">Please sign in to view your investments.</div>';
+        return;
+    }
+
+    const { data, error } = await client
+        .from('venture_investments')
+        .select('id, venture_id, amount, status, is_test, created_at')
+        .eq('investor_id', user.id)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="muted">You haven’t proposed any investments yet.</div>';
+        return;
+    }
+
+    const ventureIds = [...new Set(data.map(item => item.venture_id))];
+
+    const { data: ventures, error: venturesError } = await client
+        .from('backing_requests')
+        .select('id, venture_name')
+        .in('id', ventureIds);
+
+    if (venturesError) throw venturesError;
+
+    const ventureNames = new Map(
+        (ventures || []).map(venture => [
+            venture.id,
+            venture.venture_name
+        ])
+    );
+
+    container.innerHTML = data.map(item => {
+        const ventureName = ventureNames.get(item.venture_id) || 'Unknown venture';
+        const date = new Date(item.created_at).toLocaleDateString();
+
+        return `
+            <div class="notice" style="margin-top:12px">
+                <div style="font-weight:600">${escapeHtml(ventureName)}</div>
+                <div style="margin-top:6px">Amount: ₹${Number(item.amount).toLocaleString('en-IN')}</div>
+                <div style="margin-top:4px">Status: ${escapeHtml(item.status)}</div>
+                <div style="margin-top:4px">Type: ${item.is_test ? 'Test proposal' : 'Non-test investment'}</div>
+                <div class="muted" style="font-size:12px;margin-top:6px">Submitted: ${escapeHtml(date)}</div>
+                <div class="muted" style="font-size:12px;margin-top:4px">No payment is implied by this proposal.</div>
+            </div>
+        `;
+    }).join('');
+
+} catch (error) {
+    console.error('Could not load investments:', error);
+    container.innerHTML = '<div class="muted">Could not load investments. Please try again.</div>';
+}
+
+
+}
+
 function subscribeCommunityRealtime() {
   const client = window.clickVibeSupabase;
 
