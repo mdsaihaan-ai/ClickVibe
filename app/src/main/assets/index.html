@@ -266,6 +266,43 @@ overflow-wrap: anywhere;
 #editBackingDialog .dialog-actions button {
   flex: 1;
 }
+#backingQrDialog {
+  width: calc(100% - 40px);
+  max-width: 420px;
+  padding: 24px;
+  border: 1px solid #35414e;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #171d25, #11151b);
+  color: #f1f4f8;
+  box-shadow: 0 20px 60px #0009;
+}
+
+#backingQrDialog::backdrop {
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+#backingQrDialog h3 {
+  margin: 0 0 5px;
+  font-size: 20px;
+}
+
+#backingQrDialog .dialog-subtitle {
+  margin: 0 0 20px;
+  color: #929eac;
+  font-size: 12px;
+}
+
+#backingQrDialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 20px;
+}
+
+#backingQrDialog .dialog-actions button {
+  flex: 1;
+}
     #deleteBackingDialog {
   width: calc(100% - 40px);
   max-width: 360px;
@@ -834,7 +871,10 @@ const seed=[
 {id:'p4',type:'Idea',title:'Public venture logs',body:'Give each venture a timeline of hypotheses, experiments, costs, outcomes and next steps so people can learn from the actual process—not only the success story.',status:'Idea',category:'Product',author:'Community',time:'Sample · 3 days ago',comments:[],likes:2,updateCount:0},
 {id:'p5',type:'Venture',title:'ClickVibe Community',body:'A home for business ideas, ventures, thoughtful feedback and transparent progress. This prototype tests whether organizing work around ventures is more useful than a stream of chat.',status:'Testing',category:'Community',author:'Saihaan',time:'Sample · Today',comments:[],likes:6,updateCount:2}
 ];
-let posts=[];let backing;try{backing=JSON.parse(localStorage.getItem('cv_backing'))||[{name:'ClickVibe Community',need:'Feedback',why:'Looking for feedback on the venture-first structure and what would make people return.',author:'Saihaan'}]}catch(e){backing=[]}let filter='All';
+
+let posts=[];let backing;try{backing=JSON.parse(localStorage.getItem('cv_backing'))||[{name:'ClickVibe Community',need:'Feedback',why:'Looking for feedback on the venture-first structure and what would make people return.',author:'Saihaan'}]}catch(e){backing=[]}let backingQrMap={};let filter='All';
+
+
 const $=id=>document.getElementById(id);function persist(){try{localStorage.setItem('cv_posts',JSON.stringify(posts));localStorage.setItem('cv_backing',JSON.stringify(backing))}catch(e){}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function iconFor(t){return ({Idea:'✳',Venture:'↗',Update:'↻',Discussion:'☷',Announcement:'✦'})[t]||'•'}
@@ -858,7 +898,7 @@ ${p.bio ? `<div class="muted" style="font-size:12px;margin-top:3px;">${esc(p.bio
     ? `<img src="${esc(c.avatar_url)}" alt="" style="width:24px;height:24px;object-fit:cover;border-radius:50%;vertical-align:middle;margin-right:6px;">`
     : `<span style="display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#2a3542;font-size:10px;margin-right:6px;">${esc((c.author || 'M').charAt(0).toUpperCase())}</span>`
 }<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="requestDeleteComment('${c.id}','${p.id}', this)">Delete</button>` : ''}${window.cvIsDeveloper === true ? ` <button class="btn small" onclick="editComment('${c.id}','${p.id}', this)">Edit</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}', this)">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
-function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p><div class="cardmeta"><button class="btn small" onclick="openBackingDetail('${b.id}')">View venture →</button></div>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
+function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p><div class="cardmeta"><button class="btn small" onclick="openBackingDetail('${b.id}')">View venture →</button></div>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button><button class="btn small" onclick="openBackingQr('${b.id}')">Manage QR</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
 function navigate(view){
     [
     'home',
@@ -949,10 +989,11 @@ if (!ventureId || !amount) {
 
     try {
         const { data, error } = await client
-            .from('venture_payment_qr')
-            .select('qr_image_url')
-            .eq('is_active', true)
-            .maybeSingle();
+    .from('venture_payment_qr')
+    .select('qr_image_url')
+    .eq('backing_request_id', ventureId)
+    .eq('is_active', true)
+    .maybeSingle();
 
         if (error) throw error;
 
@@ -2384,6 +2425,194 @@ user.email?.split('@')[0] ||
     toast('Could not add reply: ' + (error.message || 'Unknown error'));
   }
 }
+
+let backingQrVentureId = null;
+
+async function openBackingQr(ventureId) {
+    if (window.cvIsDeveloper !== true) {
+        toast('Only developers can manage payment QR codes.');
+        return;
+    }
+
+    const client = window.clickVibeSupabase;
+
+    if (!client) {
+        toast('Database connection unavailable.');
+        return;
+    }
+
+    const venture = backing.find(
+        item => String(item.id) === String(ventureId)
+    );
+
+    if (!venture) {
+        toast('Venture not found.');
+        return;
+    }
+
+    backingQrVentureId = ventureId;
+
+    $('backingQrDialogTitle').textContent =
+        'Manage QR — ' + venture.name;
+
+    $('backingQrFile').value = '';
+
+    const button = $('saveBackingQrButton');
+    button.textContent = 'Save QR';
+    button.disabled = false;
+
+    try {
+        const { data, error } = await client
+            .from('venture_payment_qr')
+            .select('id')
+            .eq('backing_request_id', ventureId)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        button.textContent = data ? 'Replace QR' : 'Add QR';
+    } catch (error) {
+        console.error('Could not check venture QR:', error);
+        toast('Could not check the existing QR.');
+        return;
+    }
+
+    $('backingQrDialog').showModal();
+}
+
+async function saveBackingQr() {
+    if (window.cvIsDeveloper !== true) {
+        toast('Only developers can manage payment QR codes.');
+        return;
+    }
+
+    const client = window.clickVibeSupabase;
+    const file = $('backingQrFile').files[0];
+    const button = $('saveBackingQrButton');
+
+    if (!client || !backingQrVentureId) {
+        toast('Select a venture first.');
+        return;
+    }
+
+    if (!file) {
+        toast('Choose a QR image first.');
+        return;
+    }
+
+    const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/webp'
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+        toast('Choose a JPG, PNG, or WebP image.');
+        return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+        toast('The QR image must be 5 MB or smaller.');
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Uploading…';
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            throw new Error('Please sign in again.');
+        }
+
+        const extension = file.type === 'image/jpeg'
+            ? 'jpg'
+            : file.type === 'image/png'
+                ? 'png'
+                : 'webp';
+
+        const filePath =
+            `${backingQrVentureId}/qr-${Date.now()}.${extension}`;
+
+        const { error: uploadError } = await client.storage
+            .from('venture_payment_qr')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: file.type
+            });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicData } = client.storage
+            .from('venture_payment_qr')
+            .getPublicUrl(filePath);
+
+        const qrImageUrl = publicData.publicUrl;
+
+        const { data: existing, error: lookupError } = await client
+            .from('venture_payment_qr')
+            .select('id')
+            .eq('backing_request_id', backingQrVentureId)
+            .maybeSingle();
+
+        if (lookupError) throw lookupError;
+
+        if (existing) {
+            const { error } = await client
+                .from('venture_payment_qr')
+                .update({
+                    label: 'QR — ' + (
+                        backing.find(
+                            item => String(item.id) ===
+                                String(backingQrVentureId)
+                        )?.name || 'Venture'
+                    ),
+                    qr_image_url: qrImageUrl,
+                    is_active: true
+                })
+                .eq('id', existing.id);
+
+            if (error) throw error;
+        } else {
+            const { error } = await client
+                .from('venture_payment_qr')
+                .insert({
+                    label: 'QR — ' + (
+                        backing.find(
+                            item => String(item.id) ===
+                                String(backingQrVentureId)
+                        )?.name || 'Venture'
+                    ),
+                    qr_image_url: qrImageUrl,
+                    backing_request_id: backingQrVentureId,
+                    is_active: true,
+                    created_by: user.id
+                });
+
+            if (error) throw error;
+        }
+
+        $('backingQrDialog').close();
+        $('backingQrFile').value = '';
+
+        toast('Venture QR saved successfully.');
+    } catch (error) {
+        console.error('Could not save venture QR:', error);
+        toast('Could not save QR: ' + (error.message || 'Unknown error'));
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Save QR';
+    }
+}
+
+
 async function submitBacking() {
   const client = window.clickVibeSupabase;
   const name = $('backName').value.trim();
@@ -3680,8 +3909,44 @@ cvInitAuth();
         <button class="btn delete-confirm" type="button"
                 onclick="confirmDeleteBacking()">Delete</button>
     </div>
+
+</dialog>
+<dialog id="backingQrDialog">
+    <h3 id="backingQrDialogTitle">Manage venture QR</h3>
+    <p class="dialog-subtitle">
+        Add or replace the payment QR for this venture.
+    </p>
+
+    <div class="field">
+        <label for="backingQrFile">QR image</label>
+        <input
+                id="backingQrFile"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+        >
+        <p class="muted" style="font-size:12px;margin-top:6px">
+            Choose a PNG, JPG, or WebP image.
+        </p>
+    </div>
+
+    <div class="dialog-actions">
+        <button
+                class="btn"
+                type="button"
+                onclick="$('backingQrDialog').close()"
+        >Cancel</button>
+
+        <button
+                class="btn primary"
+                type="button"
+                id="saveBackingQrButton"
+                onclick="saveBackingQr()"
+        >Save QR</button>
+    </div>
 </dialog>
 <dialog id="avatarCropDialog">
+
+
     <h3>Adjust profile picture</h3>
     <p class="muted">Position your face inside the circle.</p>
 
