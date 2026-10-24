@@ -685,9 +685,39 @@ flex: 1;
                         Checking role…
                     </div>
                 </div>
+                <button
+                        id="adminPaymentReviewButton"
+                        class="btn hidden"
+                        type="button"
+                        onclick="openAdminPaymentReviews()"
+                        style="width:100%;margin-top:12px"
+                >
+                    Review Investment Payments
+                </button>
             </div>
 
             <div class="field">
+
+                <div id="adminPaymentReviewsPanel" class="hidden" style="margin-bottom:18px">
+                    <div class="sectionhead">
+                        <h2>Investment Payment Reviews</h2>
+                    </div>
+
+                    <button
+                            class="btn"
+                            type="button"
+                            onclick="loadAdminPaymentReviews()"
+                            style="width:100%;margin-bottom:12px"
+                    >
+                        Refresh Pending Payments
+                    </button>
+
+                    <div id="adminPaymentReviewsList">
+                        <div class="muted">Open the panel to load pending payments.</div>
+                    </div>
+                </div>
+
+
                 <label>Profile picture</label>
 
 
@@ -899,13 +929,13 @@ async function loadBackingPaymentScreen() {
         return false;
     }
 
-    const investmentId = window.cvPendingPaymentInvestmentId;
     const amount = window.cvPendingPaymentAmount;
+const ventureId = window.cvPendingPaymentVentureId;
 
-    if (!investmentId || !amount) {
-        toast('Please select an investment amount first.');
-        return false;
-    }
+if (!ventureId || !amount) {
+    toast('Please select an investment amount first.');
+    return false;
+}
 
     amountElement.textContent = '₹' + Number(amount).toLocaleString('en-IN');
 
@@ -955,59 +985,52 @@ async function loadBackingPaymentScreen() {
     }
 }
 async function simulateBackingInvestment() {
-    const client = window.clickVibeSupabase;
-    const amountInput = $('backingInvestmentAmount');
-    const amount = Number(amountInput.value);
-    const ventureId = window.cvCurrentBackingVentureId;
+const amountInput = $('backingInvestmentAmount');
+const amount = Number(amountInput.value);
+const ventureId = window.cvCurrentBackingVentureId;
 
-    if (!client) {
-        toast('Database connection unavailable.');
-        return;
-    }
 
-    if (!ventureId) {
-        toast('Please select a venture first.');
-        return;
-    }
+if (!window.clickVibeSupabase) {
+    toast('Database connection unavailable.');
+    return;
+}
 
-    if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
-        toast('Enter a valid whole amount.');
-        return;
-    }
+if (!ventureId) {
+    toast('Please select a venture first.');
+    return;
+}
 
-    try {
-        const { data: sessionData, error: sessionError } =
-            await client.auth.getSession();
+if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
+    toast('Enter a valid whole amount.');
+    return;
+}
 
-        if (sessionError) throw sessionError;
+const { data: sessionData, error: sessionError } =
+    await window.clickVibeSupabase.auth.getSession();
 
-        if (!sessionData.session?.user) {
-            toast('Please sign in first.');
-            return;
-        }
+if (sessionError) {
+    console.error(sessionError);
+    toast('Could not verify your session. Please try again.');
+    return;
+}
 
-        const { data: investmentId, error: investmentError } =
-            await client.rpc('create_manual_investment', {
-                p_venture_id: ventureId,
-                p_amount: amount
-            });
+if (!sessionData.session?.user) {
+    toast('Please sign in first.');
+    return;
+}
 
-        if (investmentError) throw investmentError;
-
-        if (!investmentId) {
-            throw new Error('No investment ID was returned.');
-        }
-
-        window.cvPendingPaymentInvestmentId = investmentId;
+// Keep the amount and venture temporarily in memory only.
+window.cvPendingPaymentInvestmentId = null;
 window.cvPendingPaymentAmount = amount;
+window.cvPendingPaymentVentureId = ventureId;
+
+$('backingPaymentTransactionId').value = '';
 
 await loadBackingPaymentScreen();
 
-    } catch (error) {
-        console.error('Could not create investment:', error);
-        toast(error.message || 'Could not create investment. Please try again.');
-    }
+
 }
+
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
 async function loadCommunityPosts() {
   const client = window.clickVibeSupabase;
@@ -1162,19 +1185,19 @@ updated_at: row.updated_at
 }
 async function submitVenturePayment() {
     const client = window.clickVibeSupabase;
-
     const transactionInput = $('backingPaymentTransactionId');
     const transactionId = transactionInput.value.trim();
 
-    const investmentId = window.cvPendingPaymentInvestmentId;
+    const ventureId = window.cvPendingPaymentVentureId;
+    const amount = window.cvPendingPaymentAmount;
 
     if (!client) {
         toast('Database connection unavailable.');
         return;
     }
 
-    if (!investmentId) {
-        toast('Investment not found. Please start again.');
+    if (!ventureId || !amount) {
+        toast('Investment details missing. Please start again.');
         return;
     }
 
@@ -1190,33 +1213,39 @@ async function submitVenturePayment() {
 
         if (sessionError) throw sessionError;
 
-        const user = sessionData.session?.user;
-
-        if (!user) {
-            toast('Please sign in first.');
+        if (!sessionData.session?.user) {
+            toast('Please sign in again.');
             return;
         }
 
-        const { error } = await client
-            .from('venture_payment_submissions')
-            .insert({
-                investment_id: investmentId,
-                transaction_id: transactionId,
-                submitted_by: user.id
-            });
+        const { data: investmentId, error } = await client.rpc(
+            'submit_venture_investment',
+            {
+                p_venture_id: ventureId,
+                p_amount: amount,
+                p_transaction_id: transactionId
+            }
+        );
 
         if (error) throw error;
 
+        if (!investmentId) {
+            throw new Error('Submission failed. Please try again.');
+        }
+
         transactionInput.value = '';
+
+        window.cvPendingPaymentInvestmentId = null;
+        window.cvPendingPaymentAmount = null;
+        window.cvPendingPaymentVentureId = null;
 
         toast('Payment submitted! Awaiting developer approval.');
 
         navigate('profile');
-
         await loadMyInvestments();
 
     } catch (error) {
-        console.error('Could not submit payment:', error);
+        console.error('Could not submit investment payment:', error);
 
         if (error.code === '23505') {
             toast('This transaction ID has already been submitted.');
@@ -1230,6 +1259,231 @@ function escapeHtml(value) {
     element.textContent = String(value ?? '');
     return element.innerHTML;
 }
+async function openAdminPaymentReviews() {
+if (window.cvIsDeveloper !== true) {
+toast('Admin access required.');
+return;
+}
+
+
+const panel = document.getElementById('adminPaymentReviewsPanel');
+
+if (!panel) return;
+
+panel.classList.remove('hidden');
+await loadAdminPaymentReviews();
+
+
+}
+
+async function loadAdminPaymentReviews() {
+const client = window.clickVibeSupabase;
+const container = document.getElementById('adminPaymentReviewsList');
+
+
+if (!container) return;
+
+if (window.cvIsDeveloper !== true) {
+    container.innerHTML = '<div class="muted">Admin access required.</div>';
+    return;
+}
+
+if (!client) {
+    container.innerHTML = '<div class="muted">Database connection unavailable.</div>';
+    return;
+}
+
+container.innerHTML = '<div class="muted">Loading pending payments...</div>';
+
+try {
+    const { data: submissions, error } = await client
+        .from('venture_payment_submissions')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (!submissions || submissions.length === 0) {
+        container.innerHTML = '<div class="muted">No pending payment submissions.</div>';
+        return;
+    }
+
+    const investmentIds = [
+        ...new Set(submissions.map(item => item.investment_id))
+    ];
+
+    const { data: investments, error: investmentsError } = await client
+        .from('venture_investments')
+        .select('id, venture_id, amount, investor_id, created_at')
+        .in('id', investmentIds);
+
+    if (investmentsError) throw investmentsError;
+
+    const ventureIds = [
+        ...new Set((investments || []).map(item => item.venture_id))
+    ];
+
+    const { data: ventures, error: venturesError } = await client
+        .from('backing_requests')
+        .select('id, venture_name')
+        .in('id', ventureIds);
+
+    if (venturesError) throw venturesError;
+
+    const investmentMap = new Map(
+        (investments || []).map(item => [item.id, item])
+    );
+
+    const ventureMap = new Map(
+        (ventures || []).map(item => [item.id, item.venture_name])
+    );
+
+    container.innerHTML = submissions.map(submission => {
+        const investment = investmentMap.get(submission.investment_id);
+        const ventureName = investment
+            ? ventureMap.get(investment.venture_id) || 'Unknown venture'
+            : 'Investment not found';
+
+        const submittedDate = submission.created_at
+            ? new Date(submission.created_at).toLocaleString()
+            : 'Unknown';
+
+        const details = Object.entries(submission)
+            .filter(([key, value]) =>
+                value !== null &&
+                value !== '' &&
+                ![
+                    'id',
+                    'investment_id',
+                    'status',
+                    'created_at',
+                    'reviewed_at',
+                    'reviewed_by'
+                ].includes(key)
+            )
+            .map(([key, value]) => {
+                const label = key
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, letter => letter.toUpperCase());
+
+                const text = String(value);
+
+                if (
+                    /url|proof|receipt|screenshot|image/i.test(key) &&
+                    /^https?:\/\//i.test(text)
+                ) {
+                    return `
+                        <div style="margin-top:6px">
+                            <strong>${escapeHtml(label)}:</strong>
+                            <a href="${escapeHtml(text)}"
+                               target="_blank"
+                               rel="noopener noreferrer">View submission</a>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div style="margin-top:6px">
+                        <strong>${escapeHtml(label)}:</strong>
+                        ${escapeHtml(text)}
+                    </div>
+                `;
+            })
+            .join('');
+
+        return `
+            <div class="notice" style="margin-top:12px">
+                <div style="font-weight:600">
+                    ${escapeHtml(ventureName)}
+                </div>
+
+                <div style="margin-top:6px">
+                    Amount: ₹${investment
+                        ? Number(investment.amount).toLocaleString('en-IN')
+                        : 'Unknown'}
+                </div>
+
+                <div class="muted" style="font-size:12px;margin-top:6px">
+                    Submitted: ${escapeHtml(submittedDate)}
+                </div>
+
+                ${details}
+
+                <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+                    <button
+                        class="btn primary"
+                        type="button"
+                        onclick="reviewAdminPayment('${escapeHtml(submission.id)}','approved')"
+                    >
+                        Approve
+                    </button>
+
+                    <button
+                        class="btn"
+                        type="button"
+                        onclick="reviewAdminPayment('${escapeHtml(submission.id)}','rejected')"
+                    >
+                        Reject
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+} catch (error) {
+    console.error('Could not load admin payment reviews:', error);
+    container.innerHTML =
+        '<div class="muted">Could not load pending payments. Check the console for details.</div>';
+}
+
+
+}
+
+async function reviewAdminPayment(submissionId, decision) {
+if (window.cvIsDeveloper !== true) {
+toast('Admin access required.');
+return;
+}
+
+
+if (!['approved', 'rejected'].includes(decision)) return;
+
+const action = decision === 'approved' ? 'approve' : 'reject';
+
+if (!confirm(`Are you sure you want to ${action} this payment submission?`)) {
+    return;
+}
+
+const client = window.clickVibeSupabase;
+
+if (!client) {
+    toast('Database connection unavailable.');
+    return;
+}
+
+try {
+    const { error } = await client.rpc('review_venture_payment', {
+        p_submission_id: submissionId,
+        p_decision: decision
+    });
+
+    if (error) throw error;
+
+    toast(decision === 'approved'
+        ? 'Payment approved successfully.'
+        : 'Payment rejected successfully.');
+
+    await loadAdminPaymentReviews();
+
+} catch (error) {
+    console.error('Could not review payment:', error);
+    toast(error.message || 'Could not review this payment.');
+}
+
+
+}
+
 async function loadMyInvestments() {
 const client = window.clickVibeSupabase;
 const container = $('myInvestmentsList');
@@ -3063,6 +3317,11 @@ if (displayName) {
       }
 
       window.cvIsDeveloper = isAdmin === true;
+      const adminPaymentReviewButton = document.getElementById('adminPaymentReviewButton');
+
+if (adminPaymentReviewButton) {
+    adminPaymentReviewButton.classList.toggle('hidden', !window.cvIsDeveloper);
+}
       const backingForm = document.querySelector('#backingView .formcard');
 
 if (backingForm) {
