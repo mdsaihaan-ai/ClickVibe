@@ -1002,6 +1002,11 @@ updated_at: row.updated_at
     toast('Could not load backing requests. Check the connection.');
   }
 }
+function escapeHtml(value) {
+    const element = document.createElement('span');
+    element.textContent = String(value ?? '');
+    return element.innerHTML;
+}
 async function loadMyInvestments() {
 const client = window.clickVibeSupabase;
 const container = $('myInvestmentsList');
