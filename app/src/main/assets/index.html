@@ -144,7 +144,8 @@ overflow-wrap: anywhere;
 }
 #deletePostDialog,
 #deleteProfileAvatarDialog,
-#deleteCommentDialog {
+#deleteCommentDialog,
+#reviewPaymentDialog {
   width: calc(100% - 40px);
   max-width: 360px;
   padding: 24px;
@@ -157,20 +158,23 @@ overflow-wrap: anywhere;
 
 #deletePostDialog::backdrop,
 #deleteProfileAvatarDialog::backdrop,
-#deleteCommentDialog::backdrop {
+#deleteCommentDialog::backdrop,
+#reviewPaymentDialog::backdrop {
   background: rgba(0, 0, 0, 0.75);
 }
 
 #deletePostDialog h3,
 #deleteProfileAvatarDialog h3,
-#deleteCommentDialog h3 {
+#deleteCommentDialog h3,
+#reviewPaymentDialog h3 {
   margin: 0 0 10px;
   font-size: 19px;
 }
 
 #deletePostDialog p,
 #deleteProfileAvatarDialog p,
-#deleteCommentDialog p {
+#deleteCommentDialog p,
+#reviewPaymentDialog p {
   margin: 0 0 24px;
   color: #aab4c0;
   font-size: 13px;
@@ -1440,49 +1444,102 @@ try {
 
 }
 
+
+let pendingPaymentReview = null;
+
+function openPaymentReviewDialog(submissionId, decision) {
+    const dialog = document.getElementById('reviewPaymentDialog');
+
+    if (!dialog || typeof dialog.showModal !== 'function') {
+        toast('Could not open payment confirmation.');
+        return false;
+    }
+
+    if (!['approved', 'rejected'].includes(decision)) {
+        return false;
+    }
+
+    pendingPaymentReview = { submissionId, decision };
+
+    const isApproval = decision === 'approved';
+
+    document.getElementById('reviewPaymentTitle').textContent =
+        isApproval ? 'Approve this payment?' : 'Reject this payment?';
+
+    document.getElementById('reviewPaymentMessage').textContent =
+        isApproval
+            ? 'Confirm that you have verified this payment and want to approve it.'
+            : 'Are you sure you want to reject this payment submission?';
+
+    document.getElementById('confirmReviewPayment').textContent =
+        isApproval ? 'Approve' : 'Reject';
+
+    dialog.showModal();
+    return true;
+}
+
+function closePaymentReviewDialog() {
+    const dialog = document.getElementById('reviewPaymentDialog');
+
+    if (dialog?.open) {
+        dialog.close();
+    }
+
+    pendingPaymentReview = null;
+}
+
+async function confirmPaymentReview() {
+    if (!pendingPaymentReview) return;
+
+    const { submissionId, decision } = pendingPaymentReview;
+
+    closePaymentReviewDialog();
+
+    if (window.cvIsDeveloper !== true) {
+        toast('Admin access required.');
+        return;
+    }
+
+    const client = window.clickVibeSupabase;
+
+    if (!client) {
+        toast('Database connection unavailable.');
+        return;
+    }
+
+    try {
+        const { error } = await client.rpc('review_venture_payment', {
+            p_submission_id: submissionId,
+            p_decision: decision
+        });
+
+        if (error) throw error;
+
+        toast(
+            decision === 'approved'
+                ? 'Payment approved successfully.'
+                : 'Payment rejected successfully.'
+        );
+
+        await loadAdminPaymentReviews();
+    } catch (error) {
+        console.error('Could not review payment:', error);
+        toast(error.message || 'Could not review this payment.');
+    }
+}
+
 async function reviewAdminPayment(submissionId, decision) {
-if (window.cvIsDeveloper !== true) {
-toast('Admin access required.');
-return;
+    if (window.cvIsDeveloper !== true) {
+        toast('Admin access required.');
+        return;
+    }
+
+    if (!['approved', 'rejected'].includes(decision)) return;
+
+    openPaymentReviewDialog(submissionId, decision);
 }
 
 
-if (!['approved', 'rejected'].includes(decision)) return;
-
-const action = decision === 'approved' ? 'approve' : 'reject';
-
-if (!confirm(`Are you sure you want to ${action} this payment submission?`)) {
-    return;
-}
-
-const client = window.clickVibeSupabase;
-
-if (!client) {
-    toast('Database connection unavailable.');
-    return;
-}
-
-try {
-    const { error } = await client.rpc('review_venture_payment', {
-        p_submission_id: submissionId,
-        p_decision: decision
-    });
-
-    if (error) throw error;
-
-    toast(decision === 'approved'
-        ? 'Payment approved successfully.'
-        : 'Payment rejected successfully.');
-
-    await loadAdminPaymentReviews();
-
-} catch (error) {
-    console.error('Could not review payment:', error);
-    toast(error.message || 'Could not review this payment.');
-}
-
-
-}
 
 async function loadMyInvestments() {
 const client = window.clickVibeSupabase;
@@ -3530,6 +3587,28 @@ cvInitAuth();
                 id="saveEditComment"
                 class="delete-dialog-confirm">
             Save changes
+        </button>
+    </div>
+</dialog>
+<dialog id="reviewPaymentDialog">
+    <h3 id="reviewPaymentTitle">Confirm payment review</h3>
+    <p id="reviewPaymentMessage">Are you sure you want to proceed?</p>
+
+    <div class="delete-dialog-actions">
+        <button
+                type="button"
+                id="cancelReviewPayment"
+                class="delete-dialog-cancel"
+                onclick="closePaymentReviewDialog()">
+            Cancel
+        </button>
+
+        <button
+                type="button"
+                id="confirmReviewPayment"
+                class="delete-dialog-confirm"
+                onclick="confirmPaymentReview()">
+            Confirm
         </button>
     </div>
 </dialog>
