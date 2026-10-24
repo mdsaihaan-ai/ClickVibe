@@ -555,6 +555,99 @@ flex: 1;
 
     </section>
 
+    <section id="backingPaymentView" class="hidden">
+
+        <button class="btn" onclick="navigate('backingInvestment')">
+            ← Back
+        </button>
+
+        <div class="hero" style="margin-top:18px">
+            <div class="eyebrow">Payment</div>
+            <h1>Complete your payment</h1>
+            <p>Scan the QR code below using your UPI app.</p>
+        </div>
+
+        <div class="formcard">
+
+            <div class="notice">
+                <div class="muted" style="font-size:13px">
+                    Investment amount
+                </div>
+                <h2 id="backingPaymentAmount"
+                    style="margin:8px 0 0">
+                    ₹0
+                </h2>
+            </div>
+
+            <div style="text-align:center;margin-top:20px">
+
+                <img
+                        id="backingPaymentQr"
+                        src=""
+                        alt="Payment QR code"
+                        style="
+                    display:none;
+                    width:100%;
+                    max-width:280px;
+                    aspect-ratio:1;
+                    object-fit:contain;
+                    margin:0 auto;
+                    border-radius:12px;
+                    background:#ffffff;
+                    padding:10px;
+                "
+                >
+
+                <div
+                        id="backingPaymentQrPlaceholder"
+                        class="notice"
+                        style="margin-top:12px"
+                >
+                    Payment QR code will appear here.
+                </div>
+
+            </div>
+
+            <div class="field" style="margin-top:22px">
+
+                <label for="backingPaymentTransactionId">
+                    UPI transaction ID
+                </label>
+
+                <input
+                        id="backingPaymentTransactionId"
+                        type="text"
+                        maxlength="200"
+                        autocomplete="off"
+                        placeholder="Enter your transaction ID"
+                >
+
+                <p class="muted"
+                   style="font-size:12px;margin-top:8px">
+                    Complete your payment first, then enter the transaction ID
+                    shown in your UPI app.
+                </p>
+
+            </div>
+
+            <button
+                    class="btn primary"
+                    type="button"
+                    style="width:100%;margin-top:16px"
+                    onclick="submitVenturePayment()"
+            >
+                Submit payment for verification →
+            </button>
+
+            <p class="muted"
+               style="font-size:12px;margin-top:12px">
+                Your payment will remain pending until the developer verifies
+                the transaction.
+            </p>
+
+        </div>
+
+    </section>
     <section id="profileView" class="hidden">
         <div class="eyebrow">Your workspace</div>
 
@@ -740,6 +833,7 @@ function navigate(view){
     'backing',
     'backingDetail',
     'backingInvestment',
+    'backingPayment',
     'profile',
     'create'
 ].forEach(v=>{
@@ -793,63 +887,127 @@ navigate('backingInvestment');
 
 
 }
+async function loadBackingPaymentScreen() {
+    const client = window.clickVibeSupabase;
+
+    const qrImage = $('backingPaymentQr');
+    const placeholder = $('backingPaymentQrPlaceholder');
+    const amountElement = $('backingPaymentAmount');
+
+    if (!client) {
+        toast('Database connection unavailable.');
+        return false;
+    }
+
+    const investmentId = window.cvPendingPaymentInvestmentId;
+    const amount = window.cvPendingPaymentAmount;
+
+    if (!investmentId || !amount) {
+        toast('Please select an investment amount first.');
+        return false;
+    }
+
+    amountElement.textContent = '₹' + Number(amount).toLocaleString('en-IN');
+
+    qrImage.style.display = 'none';
+    placeholder.style.display = 'block';
+    placeholder.textContent = 'Loading payment QR code...';
+
+    try {
+        const { data, error } = await client
+            .from('venture_payment_qr')
+            .select('qr_image_url')
+            .eq('is_active', true)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data || !data.qr_image_url) {
+            placeholder.textContent = 'Payment QR code has not been configured yet.';
+            toast('Payment QR code is not available.');
+            return false;
+        }
+
+        qrImage.onload = () => {
+            qrImage.style.display = 'block';
+            placeholder.style.display = 'none';
+        };
+
+        qrImage.onerror = () => {
+            qrImage.style.display = 'none';
+            placeholder.style.display = 'block';
+            placeholder.textContent = 'Could not load the payment QR code.';
+        };
+
+        qrImage.src = data.qr_image_url;
+
+        navigate('backingPayment');
+
+        return true;
+
+    } catch (error) {
+        console.error('Could not load payment QR:', error);
+
+        placeholder.textContent = 'Could not load the payment QR code.';
+        toast('Could not load payment QR code.');
+
+        return false;
+    }
+}
 async function simulateBackingInvestment() {
-const client = window.clickVibeSupabase;
-const amountInput = $('backingInvestmentAmount');
-const amount = Number(amountInput.value);
-const ventureId = window.cvCurrentBackingVentureId;
+    const client = window.clickVibeSupabase;
+    const amountInput = $('backingInvestmentAmount');
+    const amount = Number(amountInput.value);
+    const ventureId = window.cvCurrentBackingVentureId;
 
-
-if (!client) {
-    toast('Database connection unavailable.');
-    return;
-}
-
-if (!ventureId) {
-    toast('Please select a venture first.');
-    return;
-}
-
-if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
-    toast('Enter a valid whole amount.');
-    return;
-}
-
-try {
-    const { data: sessionData, error: sessionError } =
-        await client.auth.getSession();
-
-    if (sessionError) throw sessionError;
-
-    const user = sessionData.session?.user;
-
-    if (!user) {
-        toast('Please sign in first.');
+    if (!client) {
+        toast('Database connection unavailable.');
         return;
     }
 
-    const { error: insertError } = await client
-        .from('venture_investments')
-        .insert({
-            venture_id: ventureId,
-            investor_id: user.id,
-            amount: amount,
-            status: 'proposed',
-            is_test: true
-        });
+    if (!ventureId) {
+        toast('Please select a venture first.');
+        return;
+    }
 
-    if (insertError) throw insertError;
+    if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
+        toast('Enter a valid whole amount.');
+        return;
+    }
 
-    toast('Test proposal saved! No payment was made.');
-} catch (error) {
-    console.error('Could not save investment proposal:', error);
-    toast('Could not save proposal. Please try again.');
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        if (!sessionData.session?.user) {
+            toast('Please sign in first.');
+            return;
+        }
+
+        const { data: investmentId, error: investmentError } =
+            await client.rpc('create_manual_investment', {
+                p_venture_id: ventureId,
+                p_amount: amount
+            });
+
+        if (investmentError) throw investmentError;
+
+        if (!investmentId) {
+            throw new Error('No investment ID was returned.');
+        }
+
+        window.cvPendingPaymentInvestmentId = investmentId;
+window.cvPendingPaymentAmount = amount;
+
+await loadBackingPaymentScreen();
+
+    } catch (error) {
+        console.error('Could not create investment:', error);
+        toast(error.message || 'Could not create investment. Please try again.');
+    }
 }
-
-
-}
-
-
 function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
 async function loadCommunityPosts() {
   const client = window.clickVibeSupabase;
@@ -1002,6 +1160,71 @@ updated_at: row.updated_at
     toast('Could not load backing requests. Check the connection.');
   }
 }
+async function submitVenturePayment() {
+    const client = window.clickVibeSupabase;
+
+    const transactionInput = $('backingPaymentTransactionId');
+    const transactionId = transactionInput.value.trim();
+
+    const investmentId = window.cvPendingPaymentInvestmentId;
+
+    if (!client) {
+        toast('Database connection unavailable.');
+        return;
+    }
+
+    if (!investmentId) {
+        toast('Investment not found. Please start again.');
+        return;
+    }
+
+    if (!transactionId) {
+        toast('Please enter your UPI transaction ID.');
+        transactionInput.focus();
+        return;
+    }
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            toast('Please sign in first.');
+            return;
+        }
+
+        const { error } = await client
+            .from('venture_payment_submissions')
+            .insert({
+                investment_id: investmentId,
+                transaction_id: transactionId,
+                submitted_by: user.id
+            });
+
+        if (error) throw error;
+
+        transactionInput.value = '';
+
+        toast('Payment submitted! Awaiting developer approval.');
+
+        navigate('profile');
+
+        await loadMyInvestments();
+
+    } catch (error) {
+        console.error('Could not submit payment:', error);
+
+        if (error.code === '23505') {
+            toast('This transaction ID has already been submitted.');
+        } else {
+            toast(error.message || 'Could not submit payment. Please try again.');
+        }
+    }
+}
 function escapeHtml(value) {
     const element = document.createElement('span');
     element.textContent = String(value ?? '');
@@ -1045,7 +1268,45 @@ try {
         return;
     }
 
-    const ventureIds = [...new Set(data.map(item => item.venture_id))];
+        const investmentIds = data.map(item => item.id);
+
+    const { data: paymentSubmissions, error: paymentsError } = await client
+        .from('venture_payment_submissions')
+        .select('investment_id, status, created_at, reviewed_at')
+        .in('investment_id', investmentIds)
+        .order('created_at', { ascending: false });
+
+    if (paymentsError) throw paymentsError;
+
+    const paymentStatusByInvestment = new Map();
+
+(paymentSubmissions || []).forEach(payment => {
+    if (!paymentStatusByInvestment.has(payment.investment_id)) {
+        paymentStatusByInvestment.set(payment.investment_id, {
+            status: payment.status,
+            reviewed_at: payment.reviewed_at
+        });
+    }
+});
+    const visibleInvestments = (data || []).filter(item => {
+    const payment = paymentStatusByInvestment.get(item.id);
+
+    if (
+        payment?.status === 'rejected' &&
+        payment.reviewed_at &&
+        Date.now() - new Date(payment.reviewed_at).getTime() >= 60 * 1000
+    ) {
+        return false;
+    }
+
+    return true;
+});
+
+if (visibleInvestments.length === 0) {
+    container.innerHTML = '<div class="muted">You haven’t proposed any investments yet.</div>';
+    return;
+}
+    const ventureIds = [...new Set(visibleInvestments.map(item => item.venture_id))];
 
     const { data: ventures, error: venturesError } = await client
         .from('backing_requests')
@@ -1061,7 +1322,7 @@ try {
         ])
     );
 
-    container.innerHTML = data.map(item => {
+    container.innerHTML = visibleInvestments.map(item => {
         const ventureName = ventureNames.get(item.venture_id) || 'Unknown venture';
         const date = new Date(item.created_at).toLocaleDateString();
 
@@ -1069,7 +1330,8 @@ try {
             <div class="notice" style="margin-top:12px">
                 <div style="font-weight:600">${escapeHtml(ventureName)}</div>
                 <div style="margin-top:6px">Amount: ₹${Number(item.amount).toLocaleString('en-IN')}</div>
-                <div style="margin-top:4px">Status: ${escapeHtml(item.status)}</div>
+                <div style="margin-top:4px">Investment status: ${escapeHtml(item.status)}</div>
+<div style="margin-top:4px">Payment status: ${escapeHtml(paymentStatusByInvestment.get(item.id)?.status || 'Not submitted')}</div>
                 <div style="margin-top:4px">Type: ${item.is_test ? 'Test proposal' : 'Non-test investment'}</div>
                 <div class="muted" style="font-size:12px;margin-top:6px">Submitted: ${escapeHtml(date)}</div>
                 <div class="muted" style="font-size:12px;margin-top:4px">No payment is implied by this proposal.</div>
