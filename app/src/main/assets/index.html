@@ -417,6 +417,25 @@ margin-top: 8px;
 flex: 1;
 }
 
+#ventureChatView:not(.hidden) {
+display: flex;
+flex-direction: column;
+min-height: 0;
+padding-bottom: 8px;
+}
+
+#ventureChatView #ventureChatPanel {
+height: calc(100dvh - 390px);
+min-height: 260px;
+max-height: 600px;
+}
+
+#ventureChatView #ventureChatMessages {
+min-height: 0;
+overflow-y: auto;
+}
+
+
 </style></head>
 
 <body>
@@ -594,8 +613,171 @@ flex: 1;
         </div>
 
 
+
+    <div id="developerOpenChatPanel" class="formcard hidden" style="margin-top:16px">
+        <h3>Developer access</h3>
+        <p class="muted">Open this venture's chat without making an investment.</p>
+        <button
+                class="btn primary"
+                style="width:100%;margin-top:12px"
+                onclick="openVentureChat()"
+        >
+            Open Chat →
+        </button>
+    </div>
     </section>
 
+
+
+    <section id="ventureChatView" class="hidden">
+
+        <button class="btn" onclick="navigate('backingInvestment')">
+            ← Back to investment
+        </button>
+
+        <div class="hero" style="margin-top:18px">
+            <div class="eyebrow">Private venture discussion</div>
+            <h1 id="ventureChatTitle">Venture Chat</h1>
+            <p>Discuss progress, decisions, and the venture with its participants.</p>
+        </div>
+
+        <div class="formcard" style="
+    margin-top:14px;
+    padding:12px 8px;
+    border-radius:14px;
+">
+            <div style="
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        align-items:center;
+        gap:4px;
+    ">
+                <div style="text-align:center;min-width:0">
+                    <div class="muted" style="
+                font-size:10px;
+                line-height:1.3;
+                margin-bottom:6px;
+            ">Your Investment</div>
+                    <div id="ventureChatYourInvestment" style="
+                font-size:16px;
+                font-weight:700;
+                line-height:1.2;
+                overflow-wrap:anywhere;
+            ">₹0</div>
+                </div>
+
+                <div style="
+        text-align:center;
+        min-width:0;
+        border-left:1px solid var(--border-color, rgba(128,128,128,.25));
+        border-right:1px solid var(--border-color, rgba(128,128,128,.25));
+        padding:0 4px;
+    ">
+                    <div class="muted" style="
+            font-size:10px;
+            line-height:1.3;
+            margin-bottom:6px;
+        ">Total Investment</div>
+                    <div id="ventureChatTotalInvestment" style="
+            font-size:16px;
+            font-weight:700;
+            line-height:1.2;
+            overflow-wrap:anywhere;
+        ">₹0</div>
+                </div>
+
+                <div style="text-align:center;min-width:0">
+                    <div class="muted" style="
+            font-size:10px;
+            line-height:1.3;
+            margin-bottom:6px;
+        ">Your Profit/Loss</div>
+                    <div id="ventureChatProfitLoss" style="
+            font-size:16px;
+            font-weight:700;
+            line-height:1.2;
+            overflow-wrap:anywhere;
+        ">₹0</div>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="ventureChatPanel" class="formcard" style="
+    margin-top:14px;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    flex:1;
+    min-height:0;
+    overflow:hidden;
+">
+            <div id="ventureChatMessages" style="
+        flex:1;
+        min-height:0;
+        overflow-y:auto;
+        overscroll-behavior:contain;
+        padding:16px 12px;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+    ">
+                <p class="muted">Loading conversation...</p>
+            </div>
+
+
+            <div style="
+    flex-shrink:0;
+    padding:10px;
+    border-top:1px solid var(--line);
+    background:var(--panel);
+">
+                <div style="
+        display:flex;
+        align-items:flex-end;
+        gap:8px;
+    ">
+        <textarea
+                id="ventureChatMessageInput"
+                rows="1"
+                maxlength="3000"
+                placeholder="Message..."
+                aria-label="Your message"
+                style="
+                flex:1;
+                min-width:0;
+                resize:none;
+                max-height:110px;
+                overflow-y:auto;
+                border:1px solid var(--line);
+                border-radius:22px;
+                padding:11px 15px;
+                background:var(--panel2);
+                color:var(--text);
+                line-height:1.4;
+            "
+        ></textarea>
+
+                    <button
+                            class="btn primary"
+                            id="ventureChatSendButton"
+                            type="button"
+                            onclick="sendVentureChatMessage()"
+                            style="
+                flex-shrink:0;
+                min-height:44px;
+                border-radius:22px;
+                padding:0 17px;
+            "
+                    >Send</button>
+                </div>
+            </div>
+
+
+        </div>
+
+
+    </section>
     <section id="backingPaymentView" class="hidden">
 
         <button class="btn" onclick="navigate('backingInvestment')">
@@ -908,6 +1090,7 @@ function navigate(view){
     'backingDetail',
     'backingInvestment',
     'backingPayment',
+    'ventureChat',
     'profile',
     'create'
 ].forEach(v=>{
@@ -951,16 +1134,77 @@ $('backingDetailStatus').textContent = 'Prototype';
 navigate('backingDetail');
 }
 function openBackingInvestment(){
-const name = $('backingDetailName').textContent;
+    const name = $('backingDetailName').textContent;
 
+    $('investmentVentureName').textContent = name;
+    $('backingInvestmentAmount').value = '';
 
-$('investmentVentureName').textContent = name;
-$('backingInvestmentAmount').value = '';
+    const developerPanel = $('developerOpenChatPanel');
+    if (developerPanel) {
+        developerPanel.classList.toggle(
+            'hidden',
+            window.cvIsDeveloper !== true
+        );
+    }
 
-navigate('backingInvestment');
+    navigate('backingInvestment');
+}
+async function openVentureChat() {
+const client = window.clickVibeSupabase;
+const ventureId = window.cvCurrentBackingVentureId;
 
+if (!client || !ventureId) {
+    toast('Could not open this venture chat.');
+    return;
+}
+
+try {
+    const { data: sessionData, error: sessionError } =
+        await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+        toast('Please sign in first.');
+        return;
+    }
+
+    if (window.cvIsDeveloper !== true) {
+        const { data: investments, error: investmentError } =
+            await client
+                .from('venture_investments')
+                .select('id')
+                .eq('venture_id', ventureId)
+                .eq('investor_id', user.id)
+                .eq('status', 'verified')
+                .eq('is_test', false)
+                .limit(1);
+
+        if (investmentError) throw investmentError;
+
+        if (!investments || investments.length === 0) {
+            toast('Verified investment required to access this chat.');
+            return;
+        }
+    }
+
+    $('ventureChatTitle').textContent =
+        $('investmentVentureName').textContent || 'Venture Chat';
+
+    $('ventureChatMessages').innerHTML =
+    '<p class="muted" style="text-align:center;padding:24px 12px">No messages yet. Start the conversation!</p>';
+
+    navigate('ventureChat');
+
+} catch (error) {
+    console.error('Could not open venture chat:', error);
+    toast('Could not verify chat access.');
+}
 
 }
+
 async function loadBackingPaymentScreen() {
     const client = window.clickVibeSupabase;
 
