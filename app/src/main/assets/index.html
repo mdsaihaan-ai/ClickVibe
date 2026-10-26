@@ -615,8 +615,8 @@ overflow-y: auto;
 
 
     <div id="developerOpenChatPanel" class="formcard hidden" style="margin-top:16px">
-        <h3>Developer access</h3>
-        <p class="muted">Open this venture's chat without making an investment.</p>
+        <h3>Venture Chat</h3>
+        <p class="muted">Join the discussion with this venture's investors.</p>
         <button
                 class="btn primary"
                 style="width:100%;margin-top:12px"
@@ -1041,8 +1041,9 @@ overflow-y: auto;
         </div>
     </section>
 <section id="createView" class="hidden"><div class="eyebrow">Put an idea into the world</div><div class="sectionhead"><h2 id="createTitle">Create a post</h2><button class="btn small" onclick="navigate('home')">Cancel</button></div><div class="formcard"><div class="field"><label>Post type</label><select id="postType"><option>Idea</option><option>Venture</option><option>Update</option><option>Discussion</option><option>Announcement</option></select></div><div class="field"><label>Title</label><input id="postTitle" placeholder="Make the core idea clear"></div><div class="field"><label>Description</label><textarea id="postBody" placeholder="What is it, who does it serve, and how does it work?"></textarea></div><div class="row"><div class="field"><label>Status</label><select id="postStatus"><option>Idea</option><option>Testing</option><option>Active</option><option>Paused</option><option>Completed</option></select></div><div class="field"><label>Category</label><select id="postCategory"><option>Business</option><option>Marketing</option><option>Product</option><option>Experiment</option><option>Community</option></select></div></div><div class="notice">Keep it honest: distinguish what you've observed from what you're still testing.</div><button class="btn primary" style="width:100%" onclick="createPost()">Publish locally</button></div></section>
-</main><button class="fab" aria-label="Create post" onclick="openCreate()">＋</button>
-<nav class="bottom"><button class="nav active" data-view="home" onclick="navigate('home')"><span class="ico">⌂</span>Home</button><button class="nav" data-view="ideas" onclick="navigate('ideas')"><span class="ico">✳</span>Ideas</button><button class="nav" data-view="ventures" onclick="navigate('ventures')"><span class="ico">↗</span>Ventures</button><button class="nav" data-view="backing" onclick="navigate('backing')"><span class="ico">◇</span>Backing</button><button class="nav" data-view="profile" onclick="navigate('profile')"><span class="ico">◉</span>Profile</button></nav></div>
+</main><button id="createPostFab" class="fab" aria-label="Create post" onclick="openCreate()">＋</button>
+
+    <nav class="bottom"><button class="nav active" data-view="home" onclick="navigate('home')"><span class="ico">⌂</span>Home</button><button class="nav" data-view="ideas" onclick="navigate('ideas')"><span class="ico">✳</span>Ideas</button><button class="nav" data-view="ventures" onclick="navigate('ventures')"><span class="ico">↗</span>Ventures</button><button class="nav" data-view="backing" onclick="navigate('backing')"><span class="ico">◇</span>Backing</button><button class="nav" data-view="profile" onclick="navigate('profile')"><span class="ico">◉</span>Profile</button></nav></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script>
@@ -1100,6 +1101,12 @@ function navigate(view){
     document.querySelectorAll('.nav').forEach(n=>{
         n.classList.toggle('active',n.dataset.view===view);
     });
+    const createFab = $('createPostFab');
+
+if (createFab) {
+const showFab = ['home', 'ideas', 'ventures', 'backing'].includes(view);
+createFab.style.display = showFab ? '' : 'none';
+}
 
     if(view==='profile'){
 render();
@@ -1140,12 +1147,9 @@ function openBackingInvestment(){
     $('backingInvestmentAmount').value = '';
 
     const developerPanel = $('developerOpenChatPanel');
-    if (developerPanel) {
-        developerPanel.classList.toggle(
-            'hidden',
-            window.cvIsDeveloper !== true
-        );
-    }
+if (developerPanel) {
+    developerPanel.classList.remove('hidden');
+}
 
     navigate('backingInvestment');
 }
@@ -1197,6 +1201,7 @@ try {
     '<p class="muted" style="text-align:center;padding:24px 12px">No messages yet. Start the conversation!</p>';
 
     navigate('ventureChat');
+    loadVentureChatMessages();
 
 } catch (error) {
     console.error('Could not open venture chat:', error);
@@ -1205,6 +1210,103 @@ try {
 
 }
 
+async function loadVentureChatMessages() {
+    const client = window.clickVibeSupabase;
+    const ventureId = window.cvCurrentBackingVentureId;
+    const container = $('ventureChatMessages');
+
+    if (!client || !ventureId || !container) return;
+
+    container.innerHTML =
+        '<p class="muted" style="text-align:center">Loading messages...</p>';
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            container.textContent = 'Please sign in to view messages.';
+            return;
+        }
+
+        const { data: messages, error } = await client
+            .from('venture_chat_messages')
+            .select('id, sender_id, message, created_at')
+            .eq('venture_id', ventureId)
+            .order('created_at', { ascending: true })
+            .limit(100);
+
+        if (error) throw error;
+
+        container.replaceChildren();
+
+        if (!messages || messages.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'muted';
+            empty.style.cssText =
+                'text-align:center;padding:24px 12px';
+            empty.textContent =
+                'No messages yet. Start the conversation!';
+            container.appendChild(empty);
+            return;
+        }
+
+        messages.forEach(message => {
+            const mine = message.sender_id === user.id;
+
+            const row = document.createElement('div');
+            row.style.cssText = `
+                display:flex;
+                flex-direction:column;
+                align-items:${mine ? 'flex-end' : 'flex-start'};
+                width:100%;
+            `;
+
+            const bubble = document.createElement('div');
+            bubble.style.cssText = `
+                max-width:82%;
+                width:fit-content;
+                padding:10px 13px;
+                border-radius:${mine
+                    ? '17px 17px 4px 17px'
+                    : '17px 17px 17px 4px'};
+                background:${mine ? '#c8d1dc' : '#202833'};
+                color:${mine ? '#111821' : '#f1f4f8'};
+                overflow-wrap:anywhere;
+                white-space:pre-wrap;
+                font-size:13px;
+                line-height:1.5;
+            `;
+            bubble.textContent = message.message;
+
+            const time = document.createElement('div');
+            time.className = 'muted';
+            time.style.cssText =
+                'font-size:10px;margin:3px 5px 0';
+
+            time.textContent = new Date(message.created_at)
+                .toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+
+            row.append(bubble, time);
+            container.appendChild(row);
+        });
+
+        container.scrollTop = container.scrollHeight;
+
+    } catch (error) {
+        console.error('Loading venture messages failed:', error);
+
+        container.textContent =
+            'Could not load messages. Please try again.';
+    }
+}
 async function loadBackingPaymentScreen() {
     const client = window.clickVibeSupabase;
 
