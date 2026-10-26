@@ -1217,8 +1217,6 @@ async function loadVentureChatMessages() {
 
     if (!client || !ventureId || !container) return;
 
-    container.innerHTML =
-        '<p class="muted" style="text-align:center">Loading messages...</p>';
 
     try {
         const { data: sessionData, error: sessionError } =
@@ -1520,6 +1518,63 @@ profile
     toast('Could not load community posts. Check the connection.');
   }
 }
+async function sendVentureChatMessage() {
+const client = window.clickVibeSupabase;
+const ventureId = window.cvCurrentBackingVentureId;
+const input = $('ventureChatMessageInput');
+const button = $('ventureChatSendButton');
+
+if (!client || !ventureId || !input) {
+    toast('Chat is not ready.');
+    return;
+}
+
+const message = input.value.trim();
+
+if (!message) return;
+
+if (message.length > 2000) {
+    toast('Message is too long (max 2000 characters).');
+    return;
+}
+
+try {
+    if (button) button.disabled = true;
+
+    const { data: sessionData, error: sessionError } =
+        await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+        toast('Please sign in to send messages.');
+        return;
+    }
+
+    const { error } = await client
+        .from('venture_chat_messages')
+        .insert({
+            venture_id: ventureId,
+            sender_id: user.id,
+            message: message
+        });
+
+    if (error) throw error;
+
+    input.value = '';
+    await loadVentureChatMessages();
+
+} catch (error) {
+    console.error('Sending venture message failed:', error);
+    toast('Could not send message. Please try again.');
+} finally {
+    if (button) button.disabled = false;
+}
+
+}
+
 async function loadBackingRequests() {
   const client = window.clickVibeSupabase;
 
@@ -2102,6 +2157,52 @@ function subscribeCommunityRealtime() {
       console.log('ClickVibe Realtime:', status);
     });
 }
+function subscribeVentureChatRealtime() {
+const client = window.clickVibeSupabase;
+
+
+if (!client) return;
+
+if (window.cvVentureChatChannel) {
+    client.removeChannel(window.cvVentureChatChannel);
+}
+
+window.cvVentureChatChannel = client
+    .channel('venture-chat-live-updates')
+    .on(
+        'postgres_changes',
+        {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'venture_chat_messages'
+        },
+        (payload) => {
+            const currentVentureId =
+                window.cvCurrentBackingVentureId;
+
+            if (
+                currentVentureId &&
+                payload.new.venture_id === currentVentureId &&
+                !$('ventureChatView').classList.contains('hidden')
+            ) {
+                loadVentureChatMessages();
+            }
+        }
+    )
+    .subscribe((status, error) => {
+        console.log('Venture Chat Realtime:', status);
+
+        if (error) {
+            console.error(
+                'Venture Chat Realtime error:',
+                error
+            );
+        }
+    });
+
+
+}
+
 let editingPostId = null;
 
 function editPost(id) {
@@ -3970,6 +4071,7 @@ console.log("ClickVibe: Verified role:", window.cvIsDeveloper ? "Developer" : "M
  await loadCommunityPosts();
 await loadBackingRequests();
 subscribeCommunityRealtime();
+subscribeVentureChatRealtime();
 document.querySelector(".app").classList.remove("hidden");
 document.getElementById("communityLoading").classList.add("hidden");
 window.ClickVibeAndroid?.showWebView();
