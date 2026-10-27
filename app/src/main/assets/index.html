@@ -1201,7 +1201,8 @@ try {
     '<p class="muted" style="text-align:center;padding:24px 12px">No messages yet. Start the conversation!</p>';
 
     navigate('ventureChat');
-    loadVentureChatMessages();
+loadVentureFinancialSummary();
+loadVentureChatMessages();
 
 } catch (error) {
     console.error('Could not open venture chat:', error);
@@ -1209,6 +1210,78 @@ try {
 }
 
 }
+
+async function loadVentureFinancialSummary() {
+    const client = window.clickVibeSupabase;
+    const ventureId = window.cvCurrentBackingVentureId;
+
+    const yourInvestmentEl = $('ventureChatYourInvestment');
+    const totalInvestmentEl = $('ventureChatTotalInvestment');
+    const profitLossEl = $('ventureChatProfitLoss');
+
+    if (!client || !ventureId) return;
+
+    [yourInvestmentEl, totalInvestmentEl, profitLossEl].forEach(el => {
+        if (el) el.textContent = '…';
+    });
+
+    try {
+        const { data, error } = await client.rpc(
+            'get_venture_financial_summary',
+            { p_venture_id: ventureId }
+        );
+
+        if (error) throw error;
+
+        const summary = Array.isArray(data) ? data[0] : data;
+
+        if (!summary) {
+            throw new Error('Financial summary was empty.');
+        }
+
+        const formatMoney = value =>
+            new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: 'INR',
+                maximumFractionDigits: 2
+            }).format(Number(value) || 0);
+
+        const profitLoss = Number(summary.your_profit_loss) || 0;
+
+        if (yourInvestmentEl) {
+            yourInvestmentEl.textContent =
+                formatMoney(summary.your_investment);
+        }
+
+        if (totalInvestmentEl) {
+            totalInvestmentEl.textContent =
+                formatMoney(summary.total_investment);
+        }
+
+        if (profitLossEl) {
+            profitLossEl.textContent =
+                (profitLoss > 0 ? '+' : '') + formatMoney(profitLoss);
+
+            profitLossEl.style.color = profitLoss > 0
+                ? 'var(--success, #16803d)'
+                : profitLoss < 0
+                    ? 'var(--danger, #c0392b)'
+                    : '';
+        }
+    } catch (error) {
+        console.error(
+            'Could not load venture financial summary:',
+            error
+        );
+
+        [yourInvestmentEl, totalInvestmentEl, profitLossEl].forEach(el => {
+            if (el) el.textContent = '—';
+        });
+
+        toast('Could not load financial figures.');
+    }
+}
+
 
 async function loadVentureChatMessages() {
     const client = window.clickVibeSupabase;
