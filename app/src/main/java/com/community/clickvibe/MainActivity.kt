@@ -3,6 +3,7 @@ package com.community.clickvibe
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import androidx.activity.OnBackPressedCallback
 import android.graphics.Color
 import android.view.View
 import android.webkit.JavascriptInterface
@@ -113,8 +114,32 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+        setupBackButton()
     }
 
+    private fun setupBackButton() {
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    val view = webView
+
+                    if (view == null) {
+                        finish()
+                        return
+                    }
+
+                    view.evaluateJavascript(
+                        "typeof window.handleAndroidBack === 'function' ? window.handleAndroidBack() : false"
+                    ) { handled ->
+                        if (handled != "true") {
+                            finish()
+                        }
+                    }
+                }
+            }
+        )
+    }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

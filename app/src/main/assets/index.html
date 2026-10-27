@@ -1194,6 +1194,42 @@ loadMyInvestments();
         behavior:'smooth'
     });
 }
+function handleAndroidBack() {
+    const screenOrder = {
+        backingDetail: 'backing',
+        backingInvestment: 'backingDetail',
+        backingPayment: 'backingInvestment',
+        ventureChat: 'backingInvestment',
+        create: 'home'
+    };
+
+    const views = [
+        'home',
+        'ideas',
+        'ventures',
+        'backing',
+        'backingDetail',
+        'backingInvestment',
+        'backingPayment',
+        'ventureChat',
+        'profile',
+        'create'
+    ];
+
+    const currentView = views.find(view => {
+        const element = document.getElementById(view + 'View');
+        return element && !element.classList.contains('hidden');
+    });
+
+    if (!currentView) return false;
+
+    if (currentView === 'home') return false;
+
+    const previousView = screenOrder[currentView] || 'home';
+    navigate(previousView);
+
+    return true;
+}
 async function saveVentureMinimum() {
     if (window.cvIsDeveloper !== true) {
         toast('Only developers can change the minimum.');
