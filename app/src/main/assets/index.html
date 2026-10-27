@@ -76,7 +76,15 @@
     }
     }
 :root{color-scheme:dark;--bg:#090b0f;--panel:#11151b;--panel2:#171d25;--line:#28313c;--text:#f1f4f8;--muted:#929eac;--gold:#c8d1dc;--green:#9bd7bb;--red:#e3a5a5;--glow:#b9c6d81a;--radius:18px}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 50% -15%,#283545 0,transparent 43%),var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.01em}button,input,textarea,select{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:3px}.app{min-height:100dvh;padding-bottom:88px}.top{position:sticky;top:0;z-index:5;background:#0b0e13eF;backdrop-filter:blur(22px);border-bottom:1px solid #29323d;padding:13px 17px;display:flex;align-items:center;gap:11px}.mark{height:40px;width:40px;border:1px solid #788797;border-radius:13px;display:grid;place-items:center;color:#edf2f7;font-weight:850;font-size:12px;letter-spacing:-.05em;background:linear-gradient(145deg,#283442,#11161d);box-shadow:inset 0 1px #ffffff16,0 5px 18px #0004}.mark img {
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 50% -15%,#283545 0,transparent 43%),var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.01em}button,input,textarea,select{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:3px}.app{min-height:100dvh;padding-bottom:88px}.top{position:sticky;top:0;z-index:5;background:#0b0e13eF;backdrop-filter:blur(22px);border-bottom:1px solid #29323d;padding:13px 17px;display:flex;align-items:center;gap:11px}.mark{height:40px;width:40px;border:1px solid #788797;border-radius:13px;display:grid;place-items:center;color:#edf2f7;font-weight:850;font-size:12px;letter-spacing:-.05em;background:linear-gradient(145deg,#283442,#11161d);box-shadow:inset 0 1px #ffffff16,0 5px 18px #0004}/* Android WebView touch-focus fix */
+button:focus {
+    outline: none;
+}
+
+button:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+}.mark img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -541,6 +549,30 @@ overflow-y: auto;
                 <b id="backingDetailStatus">Planned</b>
                 <span>Venture status</span>
             </div>
+        </div>
+        <div id="developerMinimumControls" class="formcard hidden" style="margin-top:16px">
+            <h3>Developer controls</h3>
+            <p class="muted">Set the minimum investment for this venture.</p>
+
+            <div class="field">
+                <label for="developerMinimumAmount">Minimum investment (₹)</label>
+                <input
+                        id="developerMinimumAmount"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="Enter minimum amount"
+                >
+            </div>
+
+            <button
+                    class="btn primary"
+                    type="button"
+                    style="width:100%;margin-top:12px"
+                    onclick="saveVentureMinimum()"
+            >
+                Save minimum
+            </button>
         </div>
 
         <div class="formcard">
@@ -1162,6 +1194,61 @@ loadMyInvestments();
         behavior:'smooth'
     });
 }
+async function saveVentureMinimum() {
+    if (window.cvIsDeveloper !== true) {
+        toast('Only developers can change the minimum.');
+        return;
+    }
+
+    const client = window.clickVibeSupabase;
+    const ventureId = window.cvCurrentBackingVentureId;
+    const amount = Number($('developerMinimumAmount').value);
+
+    if (!client || !ventureId) {
+        toast('Could not identify this venture.');
+        return;
+    }
+
+    if (
+        $('developerMinimumAmount').value.trim() === '' ||
+        !Number.isFinite(amount) ||
+        amount < 0 ||
+        !Number.isInteger(amount)
+    ) {
+        toast('Enter a valid whole amount of ₹0 or more.');
+        return;
+    }
+
+    try {
+        const { data, error } = await client
+            .from('backing_requests')
+            .update({
+                minimum_investment: amount,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', ventureId)
+            .select('id, minimum_investment')
+            .single();
+
+        if (error) throw error;
+
+        const item = backing.find(
+            b => String(b.id) === String(ventureId)
+        );
+
+        if (item) {
+            item.minimum_investment = Number(data.minimum_investment);
+        }
+
+        $('backingDetailMinimum').textContent =
+            '₹' + Number(data.minimum_investment).toLocaleString('en-IN');
+
+        toast('Minimum investment saved.');
+    } catch (error) {
+        console.error('Could not save venture minimum:', error);
+        toast('Could not save minimum: ' + (error.message || 'Unknown error'));
+    }
+}
 function openBackingDetail(id){
 const item = backing.find(b => String(b.id) === String(id));
 
@@ -1177,7 +1264,20 @@ window.cvCurrentBackingVentureId = item.id;
 $('backingDetailName').textContent = item.name || 'Untitled venture';
 $('backingDetailDescription').textContent = item.why || 'No description available yet.';
 $('backingDetailTotal').textContent = '₹0';
-$('backingDetailMinimum').textContent = 'To be determined';
+$('backingDetailMinimum').textContent =
+    '₹' + Number(item.minimum_investment || 0).toLocaleString('en-IN');
+
+const minimumControls = $('developerMinimumControls');
+
+if (minimumControls) {
+    minimumControls.classList.toggle(
+        'hidden',
+        window.cvIsDeveloper !== true
+    );
+}
+
+$('developerMinimumAmount').value =
+    Number(item.minimum_investment || 0);
 $('backingDetailStatus').textContent = 'Prototype';
 
 navigate('backingDetail');
@@ -1600,7 +1700,21 @@ if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
     toast('Enter a valid whole amount.');
     return;
 }
+const venture = backing.find(
+    b => String(b.id) === String(ventureId)
+);
 
+const minimumInvestment = Number(
+    venture?.minimum_investment || 0
+);
+
+if (amount < minimumInvestment) {
+    toast(
+        'Minimum investment for this venture is ₹' +
+        minimumInvestment.toLocaleString('en-IN') + '.'
+    );
+    return;
+}
 const { data: sessionData, error: sessionError } =
     await window.clickVibeSupabase.auth.getSession();
 
@@ -1813,6 +1927,7 @@ id: row.id,
 name: row.venture_name,
 need: row.resources,
 why: row.reason,
+minimum_investment: Number(row.minimum_investment || 0),
 author: usernameByUserId.get(row.created_by) || row.author,
 created_by: row.created_by,
 created_at: row.created_at,
