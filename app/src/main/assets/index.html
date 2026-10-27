@@ -514,7 +514,14 @@ overflow-y: auto;
 <main class="main"><section id="homeView"><div class="hero"><div class="eyebrow">The builder network</div><h1>Make the next move <span class="gold">count.</span></h1><p>A focused space to share ideas, build ventures, document experiments, and move forward with people who get it.</p><div class="actions"><button class="btn primary" onclick="openCreate()">＋ Share an idea</button><button class="btn" onclick="navigate('ventures')">Explore ventures ↗</button></div></div><div class="stats"><div class="stat"><b id="statIdeas">3</b><span>Ideas shared</span></div><div class="stat"><b id="statVentures">2</b><span>Ventures tracked</span></div><div class="stat"><b id="statUpdates">5</b><span>Updates logged</span></div></div><div class="sectionhead"><h2>Community feed</h2><span class="muted" style="font-size:10px;letter-spacing:.2px">Live in this prototype</span></div><div class="filters" id="feedFilters"><button class="chip active" data-filter="All">All activity</button><button class="chip" data-filter="Idea">Ideas</button><button class="chip" data-filter="Venture">Ventures</button><button class="chip" data-filter="Update">Updates</button></div><div id="feed"></div></section>
 <section id="ideasView" class="hidden"><div class="eyebrow">Think out loud</div><div class="sectionhead"><h2>Ideas</h2><button class="btn small primary" onclick="openCreate('Idea')">＋ New idea</button></div><p class="muted">What should exist? Who needs it? How could it work?</p><div id="ideasList"></div></section>
 <section id="venturesView" class="hidden"><div class="eyebrow">Execution & evidence</div><div class="sectionhead"><h2>Ventures</h2><button class="btn small primary" onclick="openCreate('Venture')">＋ New venture</button></div><p class="muted">Follow the work, experiments and outcomes—not just the pitch.</p><div id="venturesList"></div></section>
-<section id="backingView" class="hidden"><div class="eyebrow">Capital & resources</div><div class="sectionhead"><h2>Backing board</h2></div><div class="notice">Prototype only. This board records discussion and resource needs; it does not accept money, offer securities or arrange investments.</div><div id="backingList"></div><div class="formcard"><h3 style="margin-top:0">What does your venture need?</h3><div class="field"><label>Venture name</label><input id="backName" placeholder="e.g. Local Food Guide"></div><div class="field"><label>Resource needed</label><select id="backNeed"><option>Feedback</option><option>Distribution</option><option>Equipment</option><option>Funding discussion</option><option>Skills / collaborator</option></select></div><div class="field"><label>Why it matters</label><textarea id="backWhy" placeholder="What will this resource help you test or achieve?"></textarea></div><button class="btn primary" onclick="submitBacking()">Post resource request</button></div></section>
+    <section id="postDetailView" class="hidden">
+        <button class="btn" type="button" onclick="closePostDetail()">
+            ← Back to posts
+        </button>
+
+        <div id="postDetailContent" style="margin-top:16px"></div>
+    </section>
+    <section id="backingView" class="hidden"><div class="eyebrow">Capital & resources</div><div class="sectionhead"><h2>Backing board</h2></div><div class="notice">Prototype only. This board records discussion and resource needs; it does not accept money, offer securities or arrange investments.</div><div id="backingList"></div><div class="formcard"><h3 style="margin-top:0">What does your venture need?</h3><div class="field"><label>Venture name</label><input id="backName" placeholder="e.g. Local Food Guide"></div><div class="field"><label>Resource needed</label><select id="backNeed"><option>Feedback</option><option>Distribution</option><option>Equipment</option><option>Funding discussion</option><option>Skills / collaborator</option></select></div><div class="field"><label>Why it matters</label><textarea id="backWhy" placeholder="What will this resource help you test or achieve?"></textarea></div><button class="btn primary" onclick="submitBacking()">Post resource request</button></div></section>
     <section id="backingDetailView" class="hidden">
         <button class="btn" onclick="navigate('backing')">
             ← Back to Backing Board
@@ -1147,7 +1154,7 @@ function card(p,compact=false){return `<article class="card" data-post-id="${p.i
   <button class="btn small" onclick="deletePost('${p.id}')">Delete</button>
 ` : ''}<div><div class="author">${esc(p.author)}</div>
 ${p.bio ? `<div class="muted" style="font-size:12px;margin-top:3px;">${esc(p.bio)}</div>` : ''}
-<div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
+<div class="time">${esc(p.time)}</div></div><span class="tag">${esc(p.status||p.type)}</span></div><h3 onclick="openPostDetail('${p.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none">${esc(p.title)}</h3><p>${esc(p.body)}</p><div class="cardmeta"><span>${esc(p.type)} · ${esc(p.category||'Business')}</span><button
   class="${p.supportedByMe ? 'supported' : ''}"
   onclick="likePost('${p.id}')">
   ${p.supportedByMe ? '♥ Supported' : '♡ Support'} · ${p.likes || 0}
@@ -1155,7 +1162,66 @@ ${p.bio ? `<div class="muted" style="font-size:12px;margin-top:3px;">${esc(p.bio
     ? `<img src="${esc(c.avatar_url)}" alt="" style="width:24px;height:24px;object-fit:cover;border-radius:50%;vertical-align:middle;margin-right:6px;">`
     : `<span style="display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#2a3542;font-size:10px;margin-right:6px;">${esc((c.author || 'M').charAt(0).toUpperCase())}</span>`
 }<strong>${esc(c.author || 'Member')}</strong>${c.user_id === window.cvUserId || window.cvIsDeveloper === true ? ` <button class="btn small" onclick="requestDeleteComment('${c.id}','${p.id}', this)">Delete</button>` : ''}${window.cvIsDeveloper === true ? ` <button class="btn small" onclick="editComment('${c.id}','${p.id}', this)">Edit</button>` : ''}<br>`}${esc(typeof c === 'string' ? c : c.body)}</div>`).join('')}<div class="commentbox"><input id="commentinput-${p.id}" placeholder="Add a useful thought…"><button class="btn small" onclick="commentPost('${p.id}', this)">Reply</button></div></div>${p.type==='Venture'?`<div class="ventureline"><span style="width:${p.status==='Active'?72:p.status==='Completed'?100:p.status==='Paused'?20:38}%"></span></div>`:''}</article>`}
-function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p><div class="cardmeta"><button class="btn small" onclick="openBackingDetail('${b.id}')">View venture →</button></div>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button><button class="btn small" onclick="openBackingQr('${b.id}')">Manage QR</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);}
+let cvCurrentPostDetailId = null;
+let cvPostDetailReturnView = 'home';
+
+function openPostDetail(postId) {
+    const post = posts.find(p => String(p.id) === String(postId));
+
+    if (!post) {
+        toast('Post not found.');
+        return;
+    }
+
+    const currentView = [
+        'home',
+        'ideas',
+        'ventures',
+        'profile'
+    ].find(view => {
+        const element = document.getElementById(view + 'View');
+        return element && !element.classList.contains('hidden');
+    });
+
+    if (currentView) {
+        cvPostDetailReturnView = currentView;
+    }
+
+    cvCurrentPostDetailId = postId;
+
+    renderPostDetail();
+    navigate('postDetail');
+}
+
+function renderPostDetail() {
+    const container = document.getElementById('postDetailContent');
+
+    if (!container || cvCurrentPostDetailId === null) return;
+
+    const post = posts.find(
+        p => String(p.id) === String(cvCurrentPostDetailId)
+    );
+
+    if (!post) {
+        container.innerHTML =
+            '<div class="empty">This post is no longer available.</div>';
+        return;
+    }
+
+    container.innerHTML = card(post);
+
+    const detailCard = container.querySelector('.card');
+
+    detailCard
+        ?.querySelector('.comment-section')
+        ?.classList.remove('hidden');
+}
+
+function closePostDetail() {
+    cvCurrentPostDetailId = null;
+    navigate(cvPostDetailReturnView || 'home');
+}
+function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p><div class="cardmeta"><button class="btn small" onclick="openBackingDetail('${b.id}')">View venture →</button></div>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button><button class="btn small" onclick="openBackingQr('${b.id}')">Manage QR</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);renderPostDetail();}
 function navigate(view){
     [
     'home',
@@ -1166,6 +1232,7 @@ function navigate(view){
     'backingInvestment',
     'backingPayment',
     'ventureChat',
+    'postDetail',
     'profile',
     'create'
 ].forEach(v=>{
@@ -1196,12 +1263,13 @@ loadMyInvestments();
 }
 function handleAndroidBack() {
     const screenOrder = {
-        backingDetail: 'backing',
-        backingInvestment: 'backingDetail',
-        backingPayment: 'backingInvestment',
-        ventureChat: 'backingInvestment',
-        create: 'home'
-    };
+    backingDetail: 'backing',
+    backingInvestment: 'backingDetail',
+    backingPayment: 'backingInvestment',
+    ventureChat: 'backingInvestment',
+    postDetail: cvPostDetailReturnView || 'home',
+    create: 'home'
+};
 
     const views = [
         'home',
@@ -1212,7 +1280,8 @@ function handleAndroidBack() {
         'backingInvestment',
         'backingPayment',
         'ventureChat',
-        'profile',
+'postDetail',
+'profile',
         'create'
     ];
 
@@ -2833,7 +2902,7 @@ function reopenComments(postId, containerId) {
   cardElement?.querySelector('.comment-section')?.classList.remove('hidden');
 }
 function requestDeleteComment(commentId, postId, button) {
-  const containerId = button?.closest('#feed, #ideasList, #venturesList, #myActivity')?.id;
+  const containerId = button?.closest('#feed, #ideasList, #venturesList, #myActivity, #postDetailView')?.id;
   if (
     !commentId ||
     !postId
@@ -2935,7 +3004,7 @@ toast('Comment deleted.');
   }
 }
 async function editComment(commentId, postId, button) {
-  const containerId = button?.closest('#feed, #ideasList, #venturesList, #myActivity')?.id;
+  const containerId = button?.closest('#feed, #ideasList, #venturesList, #myActivity, #postDetailView')?.id;
   if (window.cvIsDeveloper !== true) {
     toast('Only developers can edit comments.');
     return;
@@ -3162,6 +3231,9 @@ const { error } = await deleteQuery;
 }
 async function commentPost(id, button) {
   const input = button?.closest('.card')?.querySelector('.commentbox input');
+  const containerId = button?.closest(
+    '#feed, #ideasList, #venturesList, #myActivity, #postDetailView'
+)?.id;
 
   if (!input) {
     toast('Could not find the comment box.');
@@ -3220,10 +3292,11 @@ user.email?.split('@')[0] ||
 });
 
     input.value = '';
-    render();
+render();
 
-    $('comments-' + id)?.classList.remove('hidden');
-    toast('Reply added successfully.');
+reopenComments(id, containerId);
+
+toast('Reply added successfully.');
 
   } catch (error) {
     console.error('ClickVibe: Comment failed:', error);
