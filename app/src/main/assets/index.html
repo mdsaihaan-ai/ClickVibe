@@ -703,6 +703,48 @@ overflow-y: auto;
 
         </div>
 
+
+        <div id="ventureFinancialEventAdminPanel" class="formcard hidden" style="margin-top:14px">
+            <h3 style="margin-top:0">Record Venture Financial Event</h3>
+            <p class="muted" style="font-size:13px">
+                Record a venture's net profit or loss. Each investor's share is calculated from their verified investment.
+            </p>
+
+            <div class="field">
+                <label for="ventureFinancialEventType">Event type</label>
+                <select id="ventureFinancialEventType">
+                    <option value="profit">Profit</option>
+                    <option value="loss">Loss</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="ventureFinancialEventAmount">Amount (₹)</label>
+                <input
+                        id="ventureFinancialEventAmount"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="Enter amount"
+                >
+            </div>
+
+            <div class="field">
+                <label for="ventureFinancialEventDescription">Description</label>
+                <textarea
+                        id="ventureFinancialEventDescription"
+                        rows="3"
+                        maxlength="2000"
+                        placeholder="Describe the profit or loss..."
+                ></textarea>
+            </div>
+
+            <button class="btn primary" type="button" onclick="recordVentureFinancialEvent()">
+                Record Event
+            </button>
+        </div>
+
+
         <div id="ventureChatPanel" class="formcard" style="
     margin-top:14px;
     padding:0;
@@ -1194,6 +1236,14 @@ try {
         }
     }
 
+        const financialAdminPanel = $('ventureFinancialEventAdminPanel');
+
+    if (financialAdminPanel) {
+        financialAdminPanel.classList.toggle(
+            'hidden',
+            window.cvIsDeveloper !== true
+        );
+    }
     $('ventureChatTitle').textContent =
         $('investmentVentureName').textContent || 'Venture Chat';
 
@@ -1283,6 +1333,90 @@ async function loadVentureFinancialSummary() {
 }
 
 
+async function recordVentureFinancialEvent() {
+    const client = window.clickVibeSupabase;
+    const ventureId = window.cvCurrentBackingVentureId;
+
+    const typeEl = $('ventureFinancialEventType');
+    const amountEl = $('ventureFinancialEventAmount');
+    const descriptionEl = $('ventureFinancialEventDescription');
+
+    const button = document.querySelector(
+        '#ventureFinancialEventAdminPanel button'
+    );
+
+    if (window.cvIsDeveloper !== true) {
+        toast('Developer access required.');
+        return;
+    }
+
+    if (!client || !ventureId) {
+        toast('Could not identify the current venture.');
+        return;
+    }
+
+    const type = typeEl.value;
+    const amount = Number(amountEl.value);
+    const description = descriptionEl.value.trim();
+
+    if (!['profit', 'loss'].includes(type)) {
+        toast('Choose a valid event type.');
+        return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+        toast('Enter an amount greater than zero.');
+        amountEl.focus();
+        return;
+    }
+
+    if (!description || description.length > 2000) {
+        toast('Enter a description for the event.');
+        descriptionEl.focus();
+        return;
+    }
+
+    const originalText = button?.textContent;
+
+    try {
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Recording…';
+        }
+
+        const { error } = await client.rpc(
+            'record_venture_financial_event',
+            {
+                p_venture_id: ventureId,
+                p_event_type: type,
+                p_amount: amount,
+                p_description: description
+            }
+        );
+
+        if (error) throw error;
+
+        amountEl.value = '';
+        descriptionEl.value = '';
+
+        toast(
+            type === 'profit'
+                ? 'Profit recorded successfully.'
+                : 'Loss recorded successfully.'
+        );
+
+        await loadVentureFinancialSummary();
+
+    } catch (error) {
+        console.error('Could not record financial event:', error);
+        toast(error.message || 'Could not record financial event.');
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || 'Record Event';
+        }
+    }
+}
 async function loadVentureChatMessages() {
     const client = window.clickVibeSupabase;
     const ventureId = window.cvCurrentBackingVentureId;
