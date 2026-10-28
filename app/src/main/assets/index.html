@@ -2578,13 +2578,65 @@ async function loadNotifications() {
         }
 
         const { data, error } = await client
-            .from('app_notifications')
-            .select(
-                'id, notification_type, message, post_id, investment_id, is_read, created_at'
-            )
-            .order('created_at', { ascending: false });
+    .from('app_notifications')
+    .select(
+        'id, notification_type, message, post_id, investment_id, is_read, created_at'
+    )
+    .order('created_at', { ascending: false });
 
-        if (error) throw error;
+if (error) throw error;
+
+const investmentIds = [
+    ...new Set(
+        (data || [])
+            .filter(notification =>
+                notification.investment_id &&
+                (
+                    notification.notification_type === 'investment_approved' ||
+                    notification.notification_type === 'investment_rejected'
+                )
+            )
+            .map(notification => notification.investment_id)
+    )
+];
+
+const ventureNames = new Map();
+
+if (investmentIds.length > 0) {
+    const { data: investments, error: investmentsError } = await client
+        .from('venture_investments')
+        .select('id, venture_id')
+        .in('id', investmentIds);
+
+    if (investmentsError) throw investmentsError;
+
+    const ventureIds = [
+        ...new Set((investments || []).map(item => item.venture_id))
+    ];
+
+    if (ventureIds.length > 0) {
+        const { data: ventures, error: venturesError } = await client
+            .from('backing_requests')
+            .select('id, venture_name')
+            .in('id', ventureIds);
+
+        if (venturesError) throw venturesError;
+
+        const namesByVentureId = new Map(
+            (ventures || []).map(venture => [
+                venture.id,
+                venture.venture_name
+            ])
+        );
+
+        (investments || []).forEach(investment => {
+            ventureNames.set(
+                investment.id,
+                namesByVentureId.get(investment.venture_id) || 'Unknown venture'
+            );
+        });
+    }
+}
 
         if (!data || data.length === 0) {
             container.innerHTML =
@@ -2615,6 +2667,12 @@ if (unreadIds.length > 0) {
             const date = new Date(
                 notification.created_at
             ).toLocaleString();
+            const displayMessage =
+    notification.notification_type === 'investment_approved'
+        ? `Investment approved — ${ventureNames.get(notification.investment_id) || 'Unknown venture'}`
+        : notification.notification_type === 'investment_rejected'
+        ? `Investment rejected — ${ventureNames.get(notification.investment_id) || 'Unknown venture'}`
+        : notification.message;
 
             return `
                 <article
@@ -2625,7 +2683,7 @@ if (unreadIds.length > 0) {
                         <div class="avatar">${icon}</div>
                         <div>
                             <div class="author">
-                                ${esc(notification.message)}
+                                ${esc(displayMessage)}
                             </div>
                             <div class="time">${esc(date)}</div>
                         </div>
