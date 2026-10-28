@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "53642554532",
+    "project_id": "clickvibe-b551e",
+    "storage_bucket": "clickvibe-b551e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:53642554532:android:2f0fc749b4a7ac44c5ca31",
+        "android_client_info": {
+          "package_name": "com.community.clickvibe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAreTACd41zcZHKzx_notXwr9_mor-cLqo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
