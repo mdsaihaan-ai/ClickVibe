@@ -140,7 +140,7 @@ class MainActivity : ComponentActivity() {
                         factory = { context ->
                             AdView(context).apply {
                                 setAdSize(AdSize.BANNER)
-                                adUnitId = "ca-app-pub-3940256099942544/9214589741"
+                                adUnitId = "ca-app-pub-5803009368928238/9554102488"
                                 loadAd(AdRequest.Builder().build())
                             }
                         }
@@ -159,7 +159,7 @@ class MainActivity : ComponentActivity() {
 
         InterstitialAd.load(
             this,
-            "ca-app-pub-3940256099942544/1033173712",
+            "ca-app-pub-5803009368928238/5509869516",
             AdRequest.Builder().build(),
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
