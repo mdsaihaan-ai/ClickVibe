@@ -1136,9 +1136,7 @@ overflow-y: auto;
             </button>
         </div>
 
-        <div id="notificationsList">
-            <div class="empty">Loading notifications...</div>
-        </div>
+        <div id="notificationsList"></div>
     </section>
 </main><button id="createPostFab" class="fab" aria-label="Create post" onclick="openCreate()">＋</button>
 
@@ -2560,8 +2558,7 @@ async function loadNotifications() {
 
     if (!client || !container) return;
 
-    container.innerHTML =
-        '<div class="empty">Loading notifications...</div>';
+
 
     try {
         const { data: sessionData, error: sessionError } =
