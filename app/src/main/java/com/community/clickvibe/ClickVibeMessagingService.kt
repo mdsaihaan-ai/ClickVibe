@@ -50,7 +50,7 @@ class ClickVibeMessagingService : FirebaseMessagingService() {
         )
 
         val notification = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(applicationInfo.icon)
+            .setSmallIcon(R.drawable.ic_stat_clickvibe)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
