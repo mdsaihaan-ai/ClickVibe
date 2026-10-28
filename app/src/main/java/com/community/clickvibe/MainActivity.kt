@@ -1,6 +1,7 @@
 package com.community.clickvibe
 
 import android.content.Intent
+import com.google.firebase.messaging.FirebaseMessaging
 import android.net.Uri
 import android.os.Bundle
 import com.google.android.gms.ads.MobileAds
@@ -60,6 +61,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                android.util.Log.d("ClickVibeFCM", "FCM token retrieved successfully")
+            } else {
+                android.util.Log.e("ClickVibeFCM", "Failed to retrieve FCM token", task.exception)
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            requestPermissions(
+                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                1001
+            )
+        }
         Thread {
             MobileAds.initialize(this@MainActivity) {
                 runOnUiThread {
