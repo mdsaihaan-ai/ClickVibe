@@ -1140,11 +1140,11 @@ overflow-y: auto;
     </section>
 </main><button id="createPostFab" class="fab" aria-label="Create post" onclick="openCreate()">＋</button>
 
-    <nav class="bottom"><button class="nav active" data-view="home" onclick="navigate('home')"><span class="ico">⌂</span>Home</button><button class="nav" data-view="notifications"
+    <nav class="bottom"><button class="nav active" data-view="home" onclick="navigateFromBottomNav('home')"><span class="ico">⌂</span>Home</button><button class="nav" data-view="notifications"
                                                                                                                                               onclick="navigate('notifications')">
         <span class="ico">♧</span>
         <small>Notifications</small>
-    </button><button class="nav" data-view="ideas" onclick="navigate('ideas')"><span class="ico">✳</span>Ideas</button><button class="nav" data-view="ventures" onclick="navigate('ventures')"><span class="ico">↗</span>Ventures</button><button class="nav" data-view="backing" onclick="navigate('backing')"><span class="ico">◇</span>Backing</button><button class="nav" data-view="profile" onclick="navigate('profile')"><span class="ico">◉</span>Profile</button></nav></div>
+    </button><button class="nav" data-view="ideas" onclick="navigateFromBottomNav('ideas')"><span class="ico">✳</span>Ideas</button><button class="nav" data-view="ventures" onclick="navigateFromBottomNav('ventures')"><span class="ico">↗</span>Ventures</button><button class="nav" data-view="backing" onclick="navigateFromBottomNav('backing')"><span class="ico">◇</span>Backing</button><button class="nav" data-view="profile" onclick="navigateFromBottomNav('profile')"><span class="ico">◉</span>Profile</button></nav></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script>
@@ -1241,6 +1241,39 @@ function closePostDetail() {
     navigate(cvPostDetailReturnView || 'home');
 }
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';$('backingList').innerHTML=backing.map(b=>`<article class="card"><div class="cardtop"><div class="avatar">◇</div><div><div class="author">${esc(b.name)}</div><div class="time">Posted by ${esc(b.author)}</div></div><span class="tag">${esc(b.need)}</span></div><p style="margin-top:12px">${esc(b.why)}</p><div class="cardmeta"><button class="btn small" onclick="openBackingDetail('${b.id}')">View venture →</button></div>${window.cvIsDeveloper===true?`<div class="cardmeta"><button class="btn small" onclick="editBacking('${b.id}')">Edit</button><button class="btn small" onclick="deleteBacking('${b.id}')">Delete</button><button class="btn small" onclick="openBackingQr('${b.id}')">Manage QR</button></div>`:''}</article>`).join('');$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);renderPostDetail();}
+let cvLastInterstitialRequestAt = 0;
+
+function requestInterstitialAtNaturalBreak() {
+    const now = Date.now();
+
+    if (now - cvLastInterstitialRequestAt < 3 * 60 * 1000) {
+        return;
+    }
+
+    const bridge = window.ClickVibeAndroid;
+
+    if (
+        !bridge ||
+        typeof bridge.requestInterstitial !== 'function'
+    ) {
+        return;
+    }
+
+    cvLastInterstitialRequestAt = now;
+
+    try {
+        bridge.requestInterstitial();
+    } catch (error) {
+        console.warn('ClickVibe: Interstitial request failed.', error);
+    }
+}
+function navigateFromBottomNav(view) {
+    navigate(view);
+
+    if (['home', 'ideas', 'ventures', 'backing', 'profile'].includes(view)) {
+        requestInterstitialAtNaturalBreak();
+    }
+}
 function navigate(view){
     [
     'home',
@@ -3027,6 +3060,7 @@ if (editingPostId !== null) {
           : 'home'
     );
 
+    requestInterstitialAtNaturalBreak();
     toast('Published successfully!');
 
   } catch (error) {
