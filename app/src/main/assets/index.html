@@ -2591,6 +2591,18 @@ async function loadNotifications() {
                 '<div class="empty">You’re all caught up. No notifications yet.</div>';
             return;
         }
+        const unreadIds = data
+    .filter(notification => !notification.is_read)
+    .map(notification => notification.id);
+
+if (unreadIds.length > 0) {
+    const { error: markReadError } = await client
+        .from('app_notifications')
+        .update({ is_read: true })
+        .in('id', unreadIds);
+
+    if (markReadError) throw markReadError;
+}
 
         container.innerHTML = data.map(notification => {
             const icon = {
@@ -2617,13 +2629,7 @@ async function loadNotifications() {
                             </div>
                             <div class="time">${esc(date)}</div>
                         </div>
-                        ${notification.is_read
-    ? ''
-    : `<button
-        class="btn small"
-        type="button"
-        onclick="markNotificationRead('${notification.id}')"
-    >Mark read</button>`}
+
                     </div>
                 </article>
             `;
@@ -2637,30 +2643,6 @@ async function loadNotifications() {
 
         container.innerHTML =
             '<div class="empty">Could not load notifications. Please try again.</div>';
-    }
-}
-async function markNotificationRead(notificationId) {
-    const client = window.clickVibeSupabase;
-
-    if (!client) return;
-
-    try {
-        const { error } = await client
-            .from('app_notifications')
-            .update({ is_read: true })
-            .eq('id', notificationId);
-
-        if (error) throw error;
-
-        await loadNotifications();
-
-    } catch (error) {
-        console.error(
-            'ClickVibe: Could not mark notification as read:',
-            error
-        );
-
-        toast('Could not update notification. Please try again.');
     }
 }
 
