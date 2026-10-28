@@ -4,6 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
 import androidx.activity.OnBackPressedCallback
 import android.graphics.Color
 import android.view.View
@@ -13,6 +16,10 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -55,67 +62,79 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ClickVibeTheme {
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(
-                            top = WindowInsets.statusBars
-                                .asPaddingValues()
-                                .calculateTopPadding()
-                        ),
-                    factory = { context ->
-                        WebView(context).apply {
-                            setBackgroundColor(Color.rgb(9, 11, 15))
-                            visibility = View.INVISIBLE
-                            webView = this
+                Column(modifier = Modifier.fillMaxSize()) {
+                    AndroidView(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(
+                                top = WindowInsets.statusBars
+                                    .asPaddingValues()
+                                    .calculateTopPadding()
+                            ),
+                        factory = { context ->
+                            WebView(context).apply {
+                                setBackgroundColor(Color.rgb(9, 11, 15))
+                                visibility = View.INVISIBLE
+                                webView = this
 
-                            webChromeClient = object : WebChromeClient() {
-                                override fun onShowFileChooser(
-                                    webView: WebView?,
-                                    filePathCallback: ValueCallback<Array<Uri>>?,
-                                    fileChooserParams: FileChooserParams?
-                                ): Boolean {
-                                    this@MainActivity.fileUploadCallback?.onReceiveValue(null)
-                                    this@MainActivity.fileUploadCallback = filePathCallback
+                                webChromeClient = object : WebChromeClient() {
+                                    override fun onShowFileChooser(
+                                        webView: WebView?,
+                                        filePathCallback: ValueCallback<Array<Uri>>?,
+                                        fileChooserParams: FileChooserParams?
+                                    ): Boolean {
+                                        this@MainActivity.fileUploadCallback
+                                            ?.onReceiveValue(null)
 
+                                        this@MainActivity.fileUploadCallback =
+                                            filePathCallback
 
-                                    val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                                        addCategory(Intent.CATEGORY_OPENABLE)
-                                        type = "image/*"
+                                        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                                            addCategory(Intent.CATEGORY_OPENABLE)
+                                            type = "image/*"
+                                        }
+
+                                        filePickerLauncher.launch(intent)
+                                        return true
                                     }
-
-                                    filePickerLauncher.launch(intent)
-                                    return true
                                 }
 
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
 
-                            }
+                                addJavascriptInterface(
+                                    ClickVibeBridge(),
+                                    "ClickVibeAndroid"
+                                )
 
-
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-
-                            addJavascriptInterface(
-                                ClickVibeBridge(),
-                                "ClickVibeAndroid"
-                            )
-
-                            webViewClient = object : WebViewClient() {
-                                override fun onPageFinished(
-                                    view: WebView,
-                                    url: String
-                                ) {
-                                    super.onPageFinished(view, url)
-                                    deliverPendingCallback()
+                                webViewClient = object : WebViewClient() {
+                                    override fun onPageFinished(
+                                        view: WebView,
+                                        url: String
+                                    ) {
+                                        super.onPageFinished(view, url)
+                                        deliverPendingCallback()
+                                    }
                                 }
-                            }
 
-                            loadUrl(
-                                "file:///android_asset/index.html"
-                            )
+                                loadUrl("file:///android_asset/index.html")
+                            }
                         }
-                    }
-                )
+                    )
+
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        factory = { context ->
+                            AdView(context).apply {
+                                setAdSize(AdSize.BANNER)
+                                adUnitId = "ca-app-pub-3940256099942544/9214589741"
+                                loadAd(AdRequest.Builder().build())
+                            }
+                        }
+                    )
+                }
             }
         }
         setupBackButton()
