@@ -3,6 +3,7 @@ package com.community.clickvibe
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import com.google.android.gms.ads.MobileAds
 import androidx.activity.OnBackPressedCallback
 import android.graphics.Color
 import android.view.View
@@ -45,6 +46,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Thread {
+            MobileAds.initialize(this@MainActivity) {}
+        }.start()
         window.decorView.setBackgroundColor(Color.rgb(9, 11, 15))
 
         handleCallbackIntent(intent)
