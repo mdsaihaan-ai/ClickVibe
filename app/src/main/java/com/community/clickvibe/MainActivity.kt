@@ -7,6 +7,10 @@ import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.FullScreenContentCallback
 import androidx.activity.OnBackPressedCallback
 import android.graphics.Color
 import android.view.View
@@ -50,11 +54,17 @@ class MainActivity : ComponentActivity() {
 
     private var webView: WebView? = null
     private var pendingOAuthCallback: String? = null
+    private var interstitialAd: InterstitialAd? = null
+    private var isInterstitialLoading = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Thread {
-            MobileAds.initialize(this@MainActivity) {}
+            MobileAds.initialize(this@MainActivity) {
+                runOnUiThread {
+                    loadInterstitialAd()
+                }
+            }
         }.start()
         window.decorView.setBackgroundColor(Color.rgb(9, 11, 15))
 
@@ -138,6 +148,32 @@ class MainActivity : ComponentActivity() {
             }
         }
         setupBackButton()
+    }
+
+    private fun loadInterstitialAd() {
+        if (isInterstitialLoading || interstitialAd != null) return
+
+
+        isInterstitialLoading = true
+
+        InterstitialAd.load(
+            this,
+            "ca-app-pub-3940256099942544/1033173712",
+            AdRequest.Builder().build(),
+            object : InterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: InterstitialAd) {
+                    interstitialAd = ad
+                    isInterstitialLoading = false
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    interstitialAd = null
+                    isInterstitialLoading = false
+                }
+            }
+        )
+
+
     }
 
     private fun setupBackButton() {
