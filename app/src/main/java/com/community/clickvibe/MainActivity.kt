@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
     private var pendingOAuthCallback: String? = null
     private var interstitialAd: InterstitialAd? = null
     private var isInterstitialLoading = false
+    private var lastInterstitialShownAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -176,6 +177,30 @@ class MainActivity : ComponentActivity() {
 
     }
 
+    private fun maybeShowInterstitial() {
+        val now = System.currentTimeMillis()
+
+        if (interstitialAd == null) return
+        if (now - lastInterstitialShownAt < 3 * 60 * 1000L) return
+
+        val ad = interstitialAd ?: return
+        interstitialAd = null
+        lastInterstitialShownAt = now
+
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+                loadInterstitialAd()
+            }
+
+            override fun onAdFailedToShowFullScreenContent(adError: com.google.android.gms.ads.AdError) {
+                loadInterstitialAd()
+            }
+        }
+
+        ad.show(this)
+
+    }
+
     private fun setupBackButton() {
         onBackPressedDispatcher.addCallback(
             this,
@@ -246,6 +271,12 @@ class MainActivity : ComponentActivity() {
         fun showWebView() {
             runOnUiThread {
                 webView?.visibility = View.VISIBLE
+            }
+        }
+        @JavascriptInterface
+        fun requestInterstitial() {
+            runOnUiThread {
+                maybeShowInterstitial()
             }
         }
 
