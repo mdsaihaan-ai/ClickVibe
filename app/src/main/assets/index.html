@@ -4661,8 +4661,45 @@ async function signInWithEmail() {
   }
 }
 
+async function registerClickVibePushToken(user) {
+const client = window.clickVibeSupabase;
+
+
+if (!client || !user || !window.ClickVibeAndroid) return;
+
+try {
+    const token = window.ClickVibeAndroid.getFcmToken();
+
+    if (!token) {
+        console.log("ClickVibe: FCM token is not ready yet.");
+        return;
+    }
+
+    const { error } = await client
+        .from("device_push_tokens")
+        .upsert(
+            {
+                user_id: user.id,
+                fcm_token: token,
+                platform: "android",
+                updated_at: new Date().toISOString()
+            },
+            { onConflict: "fcm_token" }
+        );
+
+    if (error) throw error;
+
+    console.log("ClickVibe: Push token registered.");
+} catch (error) {
+    console.error("ClickVibe: Push token registration failed:", error);
+}
+
+
+}
+
 async function cvFinishLogin(user) {
   const client = window.clickVibeSupabase;
+  await registerClickVibePushToken(user);
 
   document.getElementById("authView").classList.add("hidden");
 document.querySelector(".app").classList.add("hidden");

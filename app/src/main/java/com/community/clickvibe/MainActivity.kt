@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
         }
 
     private var webView: WebView? = null
+    private var fcmToken: String? = null
     private var pendingOAuthCallback: String? = null
     private var interstitialAd: InterstitialAd? = null
     private var isInterstitialLoading = false
@@ -63,6 +64,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (task.isSuccessful) {
+                fcmToken = task.result
                 android.util.Log.d("ClickVibeFCM", "FCM token retrieved successfully")
             } else {
                 android.util.Log.e("ClickVibeFCM", "Failed to retrieve FCM token", task.exception)
@@ -281,6 +283,10 @@ class MainActivity : ComponentActivity() {
     }
 
     inner class ClickVibeBridge {
+        @JavascriptInterface
+        fun getFcmToken(): String {
+            return fcmToken ?: ""
+        }
         @JavascriptInterface
         fun showWebView() {
             runOnUiThread {
