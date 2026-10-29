@@ -2,6 +2,7 @@ package com.community.clickvibe
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.graphics.BitmapFactory
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -51,6 +52,9 @@ class ClickVibeMessagingService : FirebaseMessagingService() {
 
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_stat_clickvibe)
+            .setLargeIcon(
+                BitmapFactory.decodeResource(resources, R.drawable.clickvibe_logo)
+            )
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
