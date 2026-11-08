@@ -1,6 +1,9 @@
 package com.community.clickvibe
 
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import com.google.android.gms.ads.AdListener
 import com.google.firebase.messaging.FirebaseMessaging
 import android.net.Uri
 import android.os.Bundle
@@ -59,6 +62,9 @@ class MainActivity : ComponentActivity() {
     private var interstitialAd: InterstitialAd? = null
     private var isInterstitialLoading = false
     private var lastInterstitialShownAt = 0L
+    private val adRetryHandler = Handler(Looper.getMainLooper())
+    private var interstitialRetryDelayMs = 30_000L
+    private val interstitialRetryRunnable = Runnable { loadInterstitialAd() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -157,6 +163,40 @@ class MainActivity : ComponentActivity() {
                             AdView(context).apply {
                                 setAdSize(AdSize.BANNER)
                                 adUnitId = "ca-app-pub-5803009368928238/9554102488"
+
+                                var retryDelayMs = 30_000L
+
+                                adListener = object : AdListener() {
+                                    override fun onAdLoaded() {
+                                        retryDelayMs = 30_000L
+                                        android.util.Log.d(
+                                            "ClickVibeAds",
+                                            "Banner loaded successfully"
+                                        )
+                                    }
+
+                                    override fun onAdFailedToLoad(error: LoadAdError) {
+                                        android.util.Log.w(
+                                            "ClickVibeAds",
+                                            "Banner failed: code=${error.code}, message=${error.message}"
+                                        )
+
+                                        val delay = retryDelayMs
+                                        retryDelayMs =
+                                            (retryDelayMs * 2).coerceAtMost(5 * 60 * 1000L)
+
+                                        postDelayed({
+                                            if (!this@MainActivity.isDestroyed) {
+                                                android.util.Log.d(
+                                                    "ClickVibeAds",
+                                                    "Retrying banner load"
+                                                )
+                                                loadAd(AdRequest.Builder().build())
+                                            }
+                                        }, delay)
+                                    }
+                                }
+
                                 loadAd(AdRequest.Builder().build())
                             }
                         }
@@ -168,8 +208,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun loadInterstitialAd() {
+        if (isDestroyed || isFinishing) return
         if (isInterstitialLoading || interstitialAd != null) return
-
 
         isInterstitialLoading = true
 
@@ -179,25 +219,54 @@ class MainActivity : ComponentActivity() {
             AdRequest.Builder().build(),
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
-                    interstitialAd = ad
                     isInterstitialLoading = false
+                    interstitialAd = ad
+                    interstitialRetryDelayMs = 30_000L
+
+                    android.util.Log.d(
+                        "ClickVibeAds",
+                        "Interstitial loaded successfully"
+                    )
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
-                    interstitialAd = null
                     isInterstitialLoading = false
+                    interstitialAd = null
+
+                    android.util.Log.w(
+                        "ClickVibeAds",
+                        "Interstitial failed: domain=${error.domain}, " +
+                                "code=${error.code}, message=${error.message}"
+                    )
+
+                    val delay = interstitialRetryDelayMs
+                    interstitialRetryDelayMs =
+                        (interstitialRetryDelayMs * 2).coerceAtMost(5 * 60 * 1000L)
+
+                    android.util.Log.d(
+                        "ClickVibeAds",
+                        "Retrying interstitial in ${delay / 1000} seconds"
+                    )
+
+                    adRetryHandler.removeCallbacks(interstitialRetryRunnable)
+                    adRetryHandler.postDelayed(interstitialRetryRunnable, delay)
                 }
             }
         )
-
-
     }
 
     private fun maybeShowInterstitial() {
         val now = System.currentTimeMillis()
 
-        if (interstitialAd == null) return
-        if (now - lastInterstitialShownAt < 3 * 60 * 1000L) return
+        if (interstitialAd == null) {
+            android.util.Log.d("ClickVibeAds", "Interstitial not ready; request skipped")
+            return
+        }
+
+        if (now - lastInterstitialShownAt < 3 * 60 * 1000L) {
+            android.util.Log.d("ClickVibeAds", "Interstitial skipped: cooldown active")
+            return
+        }
 
         val ad = interstitialAd ?: return
         interstitialAd = null
@@ -205,16 +274,28 @@ class MainActivity : ComponentActivity() {
 
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
+                android.util.Log.d("ClickVibeAds", "Interstitial dismissed; loading next ad")
                 loadInterstitialAd()
             }
 
-            override fun onAdFailedToShowFullScreenContent(adError: com.google.android.gms.ads.AdError) {
+            override fun onAdFailedToShowFullScreenContent(
+                adError: com.google.android.gms.ads.AdError
+            ) {
+                android.util.Log.w(
+                    "ClickVibeAds",
+                    "Interstitial failed to show: code=${adError.code}, " +
+                            "message=${adError.message}"
+                )
                 loadInterstitialAd()
+            }
+
+            override fun onAdShowedFullScreenContent() {
+                android.util.Log.d("ClickVibeAds", "Interstitial shown")
             }
         }
 
+        android.util.Log.d("ClickVibeAds", "Showing interstitial")
         ad.show(this)
-
     }
 
     private fun setupBackButton() {
@@ -326,6 +407,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+    }
+    override fun onDestroy() {
+        adRetryHandler.removeCallbacks(interstitialRetryRunnable)
+        super.onDestroy()
     }
 }
 
