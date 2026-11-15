@@ -245,44 +245,6 @@ overflow-wrap: anywhere;
 #editCommentDialog .edit-comment-textarea::placeholder {
     color: #777;
 }
-
-#backingQrDialog {
-  width: calc(100% - 40px);
-  max-width: 420px;
-  padding: 24px;
-  border: 1px solid #35414e;
-  border-radius: 20px;
-  background: linear-gradient(145deg, #171d25, #11151b);
-  color: #f1f4f8;
-  box-shadow: 0 20px 60px #0009;
-}
-
-#backingQrDialog::backdrop {
-  background: rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(5px);
-}
-
-#backingQrDialog h3 {
-  margin: 0 0 5px;
-  font-size: 20px;
-}
-
-#backingQrDialog .dialog-subtitle {
-  margin: 0 0 20px;
-  color: #929eac;
-  font-size: 12px;
-}
-
-#backingQrDialog .dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 9px;
-  margin-top: 20px;
-}
-
-#backingQrDialog .dialog-actions button {
-  flex: 1;
-}
 #deleteBackingDialog .dialog-actions {
   display: flex;
   gap: 9px;
@@ -805,57 +767,7 @@ function handleAndroidBack() {
 
     return true;
 }
-    const client = window.clickVibeSupabase;
-    const ventureId = window.cvCurrentBackingVentureId;
-    const amount = Number($('developerMinimumAmount').value);
-
-    if (!client || !ventureId) {
-        toast('Could not identify this venture.');
-        return;
-    }
-
-    if (
-        $('developerMinimumAmount').value.trim() === '' ||
-        !Number.isFinite(amount) ||
-        amount < 0 ||
-        !Number.isInteger(amount)
-    ) {
-        toast('Enter a valid whole amount of ₹0 or more.');
-        return;
-    }
-
-    try {
-        const { data, error } = await client
-            .from('backing_requests')
-            .update({
-                minimum_investment: amount,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', ventureId)
-            .select('id, minimum_investment')
-            .single();
-
-        if (error) throw error;
-
-        const item = backing.find(
-            b => String(b.id) === String(ventureId)
-        );
-
-        if (item) {
-            item.minimum_investment = Number(data.minimum_investment);
-        }
-
-        $('backingDetailMinimum').textContent =
-            '₹' + Number(data.minimum_investment).toLocaleString('en-IN');
-
-        toast('Minimum investment saved.');
-    } catch (error) {
-        console.error('Could not save venture minimum:', error);
-        toast('Could not save minimum: ' + (error.message || 'Unknown error'));
-    }
-}
-
-function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
+    function openCreate(type){$('postType').value=type||'Idea';$('postTitle').value='';$('postBody').value='';$('postStatus').value=type==='Venture'?'Testing':'Idea';$('createTitle').textContent=type==='Venture'?'Create a venture':'Create a post';navigate('create')}
 async function loadCommunityPosts() {
   const client = window.clickVibeSupabase;
 
@@ -1815,117 +1727,6 @@ toast('Reply added successfully.');
     toast('Could not add reply: ' + (error.message || 'Unknown error'));
   }
 }
-
-let backingQrVentureId = null;
-
-let editingBackingId = null;
-
-  const client = window.clickVibeSupabase;
-  const id = editingBackingId;
-  const name = $('editBackingName').value.trim();
-  const need = $('editBackingNeed').value;
-  const why = $('editBackingWhy').value.trim();
-
-  if (!id || !client) {
-    toast('Unable to save changes.');
-    return;
-  }
-
-  if (!name || !why) {
-    toast('All fields must be filled in.');
-    return;
-  }
-
-  const saveButton = document.querySelector(
-    '#editBackingDialog .btn.primary'
-  );
-
-  if (saveButton) saveButton.disabled = true;
-
-  try {
-    const { data, error } = await client
-      .from('backing_requests')
-      .update({
-        title: name,
-        venture_name: name,
-        resources: need,
-        reason: why,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    const item = backing.find(b => b.id === id);
-
-    if (item) {
-      Object.assign(item, {
-        name: data.venture_name,
-        need: data.resources,
-        why: data.reason,
-        author: data.author,
-        updated_at: data.updated_at
-      });
-    }
-
-    $('editBackingDialog').close();
-    editingBackingId = null;
-
-    render();
-    toast('Backing request updated.');
-
-  } catch (error) {
-    console.error('ClickVibe: Backing edit failed:', error);
-    toast('Could not edit request: ' + (error.message || 'Unknown error'));
-
-  } finally {
-    if (saveButton) saveButton.disabled = false;
-  }
-}
-
-let deletingBackingId = null;
-
-  const id = deletingBackingId;
-  const client = window.clickVibeSupabase;
-  const item = backing.find(b => b.id === id);
-
-  if (!id || !item || !client) {
-    toast('Unable to delete this request.');
-    return;
-  }
-
-  const deleteButton = document.querySelector(
-    '#deleteBackingDialog .delete-confirm'
-  );
-
-  if (deleteButton) deleteButton.disabled = true;
-
-  try {
-    const { error } = await client
-      .from('backing_requests')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-
-    backing = backing.filter(b => b.id !== id);
-
-    $('deleteBackingDialog').close();
-    deletingBackingId = null;
-
-    render();
-    toast('Backing request deleted.');
-
-  } catch (error) {
-    console.error('ClickVibe: Backing deletion failed:', error);
-    toast('Could not delete request: ' + (error.message || 'Unknown error'));
-
-  } finally {
-    if (deleteButton) deleteButton.disabled = false;
-  }
-}
 async function saveProfile() {
     const client = window.clickVibeSupabase;
     const username = $('profileName').value.trim();
@@ -2709,16 +2510,6 @@ if (displayName) {
       }
 
       window.cvIsDeveloper = isAdmin === true;
-      const adminPaymentReviewButton = document.getElementById('adminPaymentReviewButton');
-
-if (adminPaymentReviewButton) {
-    adminPaymentReviewButton.classList.toggle('hidden', !window.cvIsDeveloper);
-}
-      const backingForm = document.querySelector('#backingView .formcard');
-
-if (backingForm) {
-  backingForm.classList.toggle('hidden', !window.cvIsDeveloper);
-}
 roleElement.textContent = window.cvIsDeveloper ? "Developer" : "Member";
 console.log("ClickVibe: Verified role:", window.cvIsDeveloper ? "Developer" : "Member");
     } catch (error) {
@@ -2967,39 +2758,7 @@ cvInitAuth();
     </div>
 </dialog>
 
-<dialog id="backingQrDialog">
-    <h3 id="backingQrDialogTitle">Manage venture QR</h3>
-    <p class="dialog-subtitle">
-        Add or replace the payment QR for this venture.
-    </p>
 
-    <div class="field">
-        <label for="backingQrFile">QR image</label>
-        <input
-                id="backingQrFile"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-        >
-        <p class="muted" style="font-size:12px;margin-top:6px">
-            Choose a PNG, JPG, or WebP image.
-        </p>
-    </div>
-
-    <div class="dialog-actions">
-        <button
-                class="btn"
-                type="button"
-                onclick="$('backingQrDialog').close()"
-        >Cancel</button>
-
-        <button
-                class="btn primary"
-                type="button"
-                id="saveBackingQrButton"
-                onclick="saveBackingQr()"
-        >Save QR</button>
-    </div>
-</dialog>
 <dialog id="avatarCropDialog">
 
 
