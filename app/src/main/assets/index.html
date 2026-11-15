@@ -1000,37 +1000,11 @@ overflow-y: auto;
                         Checking role…
                     </div>
                 </div>
-                <button
-                        id="adminPaymentReviewButton"
-                        class="btn hidden"
-                        type="button"
-                        onclick="openAdminPaymentReviews()"
-                        style="width:100%;margin-top:12px"
-                >
-                    Review Investment Payments
-                </button>
+
             </div>
 
             <div class="field">
 
-                <div id="adminPaymentReviewsPanel" class="hidden" style="margin-bottom:18px">
-                    <div class="sectionhead">
-                        <h2>Investment Payment Reviews</h2>
-                    </div>
-
-                    <button
-                            class="btn"
-                            type="button"
-                            onclick="loadAdminPaymentReviews()"
-                            style="width:100%;margin-bottom:12px"
-                    >
-                        Refresh Pending Payments
-                    </button>
-
-                    <div id="adminPaymentReviewsList">
-                        <div class="muted">Open the panel to load pending payments.</div>
-                    </div>
-                </div>
 
 
                 <label>Profile picture</label>
@@ -1101,32 +1075,6 @@ overflow-y: auto;
         </div>
 
         <div id="myActivity"></div>
-        <div class="sectionhead" style="margin-top:24px">
-            <h2>My Investments</h2>
-        </div>
-
-        <div class="formcard">
-            <p class="muted" style="font-size:13px;margin-top:0">
-                Track your venture proposals, contributions, and investment status.
-            </p>
-
-
-            <div id="myInvestmentsList">
-                <div class="muted">Your investments will appear here.</div>
-            </div>
-
-            <button
-                    class="btn"
-                    type="button"
-                    onclick="loadMyInvestments()"
-                    style="width:100%;margin-top:14px"
-            >
-                Refresh Investments
-            </button>
-
-
-        </div>
-
 
         <div class="notice">
             Your account is authenticated through ClickVibe. Profile and community content will be connected to the shared database as development continues.
@@ -1312,7 +1260,6 @@ createFab.style.display = showFab ? '' : 'none';
     if(view==='profile'){
 render();
 loadProfileAvatar();
-loadMyInvestments();
 }
 
 
