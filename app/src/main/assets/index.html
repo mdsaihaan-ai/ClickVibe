@@ -708,6 +708,65 @@ function navigateFromBottomNav(view) {
         requestInterstitialAtNaturalBreak();
     }
 }
+function openCreateGroup() {
+    document.getElementById('groupNameInput').value = '';
+    document.getElementById('groupDescriptionInput').value = '';
+    document.getElementById('groupPrivacyInput').value = 'public';
+    document.getElementById('createGroupDialog').showModal();
+}
+
+function closeCreateGroup() {
+    document.getElementById('createGroupDialog').close();
+}
+async function createGroup() {
+    const client = window.clickVibeSupabase;
+
+    if (!client) {
+        toast('Database connection unavailable.');
+        return;
+    }
+
+    const name = document.getElementById('groupNameInput').value.trim();
+    const description = document.getElementById('groupDescriptionInput').value.trim();
+    const privacy = document.getElementById('groupPrivacyInput').value;
+
+    if (!name) {
+        toast('Please enter a group name.');
+        return;
+    }
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            toast('Please log in first.');
+            return;
+        }
+
+        const { error } = await client
+            .from('community_groups')
+            .insert({
+                name: name,
+                description: description,
+                privacy: privacy,
+                created_by: user.id
+            });
+
+        if (error) throw error;
+
+        closeCreateGroup();
+        toast('Group created successfully!');
+
+    } catch (error) {
+        console.error('ClickVibe: Group creation failed:', error);
+        toast('Could not create group: ' + error.message);
+    }
+}
 function showGroupSection(section) {
     const sections = {
         mine: 'myGroupsList',
@@ -2698,6 +2757,38 @@ cvInitAuth();
                 id="confirmDeletePost"
                 class="delete-dialog-confirm">
             Delete
+        </button>
+    </div>
+</dialog>
+<dialog id="createGroupDialog">
+    <h3>Create a group</h3>
+    <p>Bring people together around a shared interest or goal.</p>
+
+    <input
+            type="text"
+            id="groupNameInput"
+            placeholder="Group name"
+            maxlength="60">
+
+    <textarea
+            id="groupDescriptionInput"
+            placeholder="What is this group about?"
+            rows="3"
+            maxlength="300"></textarea>
+
+    <select id="groupPrivacyInput">
+        <option value="public">Public — anyone can discover it</option>
+        <option value="private">Private — invitation only</option>
+    </select>
+
+    <div class="delete-dialog-actions">
+        <button type="button" class="delete-dialog-cancel"
+                onclick="closeCreateGroup()">
+            Cancel
+        </button>
+        <button type="button" class="delete-dialog-confirm"
+                onclick="createGroup()">
+            Create group
         </button>
     </div>
 </dialog>
