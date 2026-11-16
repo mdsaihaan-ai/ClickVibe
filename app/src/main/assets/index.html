@@ -387,9 +387,25 @@ flex: 1;
                 onclick="navigate('notifications')">♧</button>
     </header>
 
-<main class="main"><section id="homeView"><div class="hero"><div class="eyebrow">The builder network</div><h1>Make the next move <span class="gold">count.</span></h1><p>A focused space to share ideas, build ventures, document experiments, and move forward with people who get it.</p><div class="actions"><button class="btn primary" onclick="openCreate()">＋ Share an idea</button><button class="btn" onclick="navigate('ventures')">Explore ventures ↗</button></div></div><div class="stats"><div class="stat"><b id="statIdeas">3</b><span>Ideas shared</span></div><div class="stat"><b id="statVentures">2</b><span>Ventures tracked</span></div><div class="stat"><b id="statUpdates">5</b><span>Updates logged</span></div></div><div class="sectionhead"><h2>Community feed</h2><span class="muted" style="font-size:10px;letter-spacing:.2px">Live in this prototype</span></div><div class="filters" id="feedFilters"><button class="chip active" data-filter="All">All activity</button><button class="chip" data-filter="Idea">Ideas</button><button class="chip" data-filter="Venture">Ventures</button><button class="chip" data-filter="Update">Updates</button></div><div id="feed"></div></section>
+<main class="main"><section id="homeView"><div class="hero"><div class="eyebrow">The builder network</div><h1>Make the next move <span class="gold">count.</span></h1><p>A focused space to share ideas, build ventures, document experiments, and move forward with people who get it.</p><div class="actions"><button class="btn primary" onclick="openCreate()">＋ Share an idea</button><button class="btn" onclick="navigate('explore')">Explore projects ↗</button></div></div><div class="stats"><div class="stat"><b id="statIdeas">3</b><span>Ideas shared</span></div><div class="stat"><b id="statVentures">2</b><span>Ventures tracked</span></div><div class="stat"><b id="statUpdates">5</b><span>Updates logged</span></div></div><div class="sectionhead"><h2>Community feed</h2><span class="muted" style="font-size:10px;letter-spacing:.2px">Live in this prototype</span></div><div class="filters" id="feedFilters"><button class="chip active" data-filter="All">All activity</button><button class="chip" data-filter="Idea">Ideas</button><button class="chip" data-filter="Venture">Ventures</button><button class="chip" data-filter="Update">Updates</button></div><div id="feed"></div></section>
 <section id="ideasView" class="hidden"><div class="eyebrow">Think out loud</div><div class="sectionhead"><h2>Ideas</h2><button class="btn small primary" onclick="openCreate('Idea')">＋ New idea</button></div><p class="muted">What should exist? Who needs it? How could it work?</p><div id="ideasList"></div></section>
-<section id="venturesView" class="hidden"><div class="eyebrow">Execution & evidence</div><div class="sectionhead"><h2>Ventures</h2><button class="btn small primary" onclick="openCreate('Venture')">＋ New venture</button></div><p class="muted">Follow the work, experiments and outcomes—not just the pitch.</p><div id="venturesList"></div></section>
+    <section id="groupsView" class="hidden">
+        <div class="eyebrow">Build together</div>
+        <div class="sectionhead">
+            <h2>Groups</h2>
+            <button class="btn small primary" onclick="openCreateGroup()">＋ Create group</button>
+        </div>
+        <p class="muted">Find your people, exchange ideas and build together.</p>
+        <div id="groupsList"></div>
+    </section>
+    <section id="exploreView" class="hidden">
+        <div class="eyebrow">Discover the work</div>
+        <div class="sectionhead">
+            <h2>Explore</h2>
+        </div>
+        <p class="muted">Discover projects, prototypes, milestones, achievements and the work people are building.</p>
+        <div id="exploreList"></div>
+    </section>
     <section id="postDetailView" class="hidden">
         <button class="btn" type="button" onclick="closePostDetail()">
             ← Back to posts
@@ -539,7 +555,13 @@ flex: 1;
     </section>
 </main><button id="createPostFab" class="fab" aria-label="Create post" onclick="openCreate()">＋</button>
 
-    <nav class="bottom"><button class="nav active" data-view="home" onclick="navigateFromBottomNav('home')"><span class="ico">⌂</span>Home</button><button class="nav" data-view="ideas" onclick="navigateFromBottomNav('ideas')"><span class="ico">✳</span>Ideas</button><button class="nav" data-view="ventures" onclick="navigateFromBottomNav('ventures')"><span class="ico">↗</span>Ventures</button><button class="nav" data-view="profile" onclick="navigateFromBottomNav('profile')"><span class="ico">◉</span>Profile</button></nav></div>
+    <nav class="bottom">
+        <button class="nav active" data-view="home" onclick="navigateFromBottomNav('home')"><span class="ico">⌂</span>Home</button>
+        <button class="nav" data-view="ideas" onclick="navigateFromBottomNav('ideas')"><span class="ico">✳</span>Ideas</button>
+        <button class="nav" data-view="groups" onclick="navigateFromBottomNav('groups')"><span class="ico">♧</span>Groups</button>
+        <button class="nav" data-view="explore" onclick="navigateFromBottomNav('explore')"><span class="ico">⌕</span>Explore</button>
+        <button class="nav" data-view="profile" onclick="navigateFromBottomNav('profile')"><span class="ico">◉</span>Profile</button>
+    </nav></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script>
@@ -586,11 +608,12 @@ function openPostDetail(postId) {
     }
 
     const currentView = [
-        'home',
-        'ideas',
-        'ventures',
-        'profile'
-    ].find(view => {
+    'home',
+    'ideas',
+    'groups',
+    'explore',
+    'profile'
+].find(view => {
         const element = document.getElementById(view + 'View');
         return element && !element.classList.contains('hidden');
     });
@@ -633,7 +656,7 @@ function closePostDetail() {
     cvCurrentPostDetailId = null;
     navigate(cvPostDetailReturnView || 'home');
 }
-function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('venturesList').innerHTML=posts.filter(p=>p.type==='Venture').map(p=>card(p)).join('')||'<div class="empty">No ventures yet. Create one to track its progress.</div>';;$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);renderPostDetail();}
+function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('exploreList').innerHTML=posts.filter(p=>p.type!=='Idea').map(p=>card(p)).join('')||'<div class="empty">No projects or work updates to explore yet.</div>';;$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);renderPostDetail();}
 let cvLastInterstitialRequestAt = 0;
 
 function requestInterstitialAtNaturalBreak() {
@@ -663,7 +686,7 @@ function requestInterstitialAtNaturalBreak() {
 function navigateFromBottomNav(view) {
     navigate(view);
 
-    if (['home', 'ideas', 'ventures', 'profile'].includes(view)) {
+    if (['home', 'ideas', 'groups', 'explore', 'profile'].includes(view)) {
         requestInterstitialAtNaturalBreak();
     }
 }
@@ -671,7 +694,8 @@ function navigate(view){
     [
     'home',
     'ideas',
-    'ventures',
+    'groups',
+    'explore',
     'postDetail',
     'profile',
     'create',
@@ -686,7 +710,7 @@ function navigate(view){
     const createFab = $('createPostFab');
 
 if (createFab) {
-const showFab = ['home', 'ideas', 'ventures'].includes(view);
+const showFab = ['home', 'ideas', 'explore'].includes(view);
 createFab.style.display = showFab ? '' : 'none';
 }
 
@@ -714,7 +738,8 @@ function handleAndroidBack() {
     const views = [
     'home',
     'ideas',
-    'ventures',
+    'groups',
+    'explore',
     'postDetail',
     'notifications',
     'profile',
@@ -1155,9 +1180,9 @@ if (editingPostId !== null) {
     updatedType === 'Idea'
       ? 'ideas'
       : updatedType === 'Venture'
-        ? 'ventures'
+        ? 'explore'
         : 'home'
-  );
+);
 
   toast('Post updated successfully!');
   return;
@@ -1203,12 +1228,12 @@ if (editingPostId !== null) {
     render();
 
     navigate(
-      type === 'Idea'
-        ? 'ideas'
-        : type === 'Venture'
-          ? 'ventures'
-          : 'home'
-    );
+    type === 'Idea'
+      ? 'ideas'
+      : type === 'Venture'
+        ? 'explore'
+        : 'home'
+);
 
     requestInterstitialAtNaturalBreak();
     toast('Published successfully!');
@@ -1294,7 +1319,7 @@ function reopenComments(postId, containerId) {
   cardElement?.querySelector('.comment-section')?.classList.remove('hidden');
 }
 function requestDeleteComment(commentId, postId, button) {
-  const containerId = button?.closest('#feed, #ideasList, #venturesList, #myActivity, #postDetailView')?.id;
+  const containerId = button?.closest('#feed, #ideasList, #exploreList, #myActivity, #postDetailView')?.id;
   if (
     !commentId ||
     !postId
@@ -1396,7 +1421,7 @@ toast('Comment deleted.');
   }
 }
 async function editComment(commentId, postId, button) {
-  const containerId = button?.closest('#feed, #ideasList, #venturesList, #myActivity, #postDetailView')?.id;
+  const containerId = button?.closest('#feed, #ideasList, ##exploreList, #myActivity, #postDetailView')?.id;
   if (window.cvIsDeveloper !== true) {
     toast('Only developers can edit comments.');
     return;
@@ -1624,7 +1649,7 @@ const { error } = await deleteQuery;
 async function commentPost(id, button) {
   const input = button?.closest('.card')?.querySelector('.commentbox input');
   const containerId = button?.closest(
-    '#feed, #ideasList, #venturesList, #myActivity, #postDetailView'
+    '#feed, #ideasList, #exploreList, #myActivity, #postDetailView'
 )?.id;
 
   if (!input) {
