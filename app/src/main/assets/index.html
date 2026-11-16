@@ -824,7 +824,12 @@ loadProfileAvatar();
     loadNotifications();
 }
 if (view === 'groups') {
+    subscribeGroupsRealtime();
     loadMyGroups();
+    loadDiscoverGroups();
+} else if (window.cvGroupsChannel) {
+    window.clickVibeSupabase.removeChannel(window.cvGroupsChannel);
+    window.cvGroupsChannel = null;
 }
     window.scrollTo({
         top:0,
@@ -959,6 +964,143 @@ profile
     );
     toast('Could not load community posts. Check the connection.');
   }
+}
+function subscribeGroupsRealtime() {
+    const client = window.clickVibeSupabase;
+
+    if (!client) return;
+
+    if (window.cvGroupsChannel) {
+        client.removeChannel(window.cvGroupsChannel);
+        window.cvGroupsChannel = null;
+    }
+
+    window.cvGroupsChannel = client
+        .channel('groups-live-updates')
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'community_groups'
+            },
+            () => {
+    loadMyGroups();
+    loadDiscoverGroups();
+}
+        )
+        .subscribe();
+}
+async function joinGroup(groupId) {
+    const client = window.clickVibeSupabase;
+
+    if (!client) {
+        toast('Database connection unavailable.');
+        return;
+    }
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            toast('Please log in first.');
+            return;
+        }
+
+        const { error } = await client
+            .from('group_members')
+            .insert({
+                group_id: groupId,
+                user_id: user.id,
+                role: 'member',
+                status: 'active'
+            });
+
+        if (error) throw error;
+
+        await loadMyGroups();
+        await loadDiscoverGroups();
+
+        toast('You joined the group!');
+
+    } catch (error) {
+        console.error('ClickVibe: Could not join group:', error);
+        toast('Could not join group: ' + error.message);
+    }
+}
+async function loadDiscoverGroups() {
+    const client = window.clickVibeSupabase;
+    const container = document.getElementById('discoverGroupsList');
+
+    if (!client || !container) return;
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            container.innerHTML = '<div class="empty">Please log in to discover groups.</div>';
+            return;
+        }
+
+        const { data: groups, error: groupsError } = await client
+            .from('community_groups')
+            .select('*')
+            .eq('privacy', 'public')
+            .order('created_at', { ascending: false });
+
+        if (groupsError) throw groupsError;
+
+        const { data: memberships, error: membershipError } = await client
+            .from('group_members')
+            .select('group_id')
+            .eq('user_id', user.id)
+            .eq('status', 'active');
+
+        if (membershipError) throw membershipError;
+
+        const joinedIds = new Set(
+            (memberships || []).map(m => m.group_id)
+        );
+
+        const availableGroups = (groups || []).filter(
+            group => !joinedIds.has(group.id)
+        );
+
+        if (availableGroups.length === 0) {
+            container.innerHTML = '<div class="empty">No new public groups to discover yet.</div>';
+            return;
+        }
+
+        container.innerHTML = availableGroups.map(group => `
+            <article class="card">
+                <div class="cardtop">
+                    <div>
+                        <div class="author">${escapeHtml(group.name)}</div>
+                        <div class="time">Public group</div>
+                    </div>
+                </div>
+                <p style="margin-top:12px">${escapeHtml(group.description)}</p>
+                <button class="btn small primary"
+                    onclick="joinGroup('${group.id}')">
+                    Join group
+                </button>
+            </article>
+        `).join('');
+
+    } catch (error) {
+        console.error('ClickVibe: Could not discover groups:', error);
+        container.innerHTML = '<div class="empty">Could not load public groups.</div>';
+    }
 }
 async function loadMyGroups() {
     const client = window.clickVibeSupabase;
