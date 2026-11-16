@@ -391,12 +391,30 @@ flex: 1;
 <section id="ideasView" class="hidden"><div class="eyebrow">Think out loud</div><div class="sectionhead"><h2>Ideas</h2><button class="btn small primary" onclick="openCreate('Idea')">＋ New idea</button></div><p class="muted">What should exist? Who needs it? How could it work?</p><div id="ideasList"></div></section>
     <section id="groupsView" class="hidden">
         <div class="eyebrow">Build together</div>
+
         <div class="sectionhead">
             <h2>Groups</h2>
             <button class="btn small primary" onclick="openCreateGroup()">＋ Create group</button>
         </div>
+
         <p class="muted">Find your people, exchange ideas and build together.</p>
-        <div id="groupsList"></div>
+
+        <div class="filters" id="groupFilters">
+            <button class="chip active" onclick="showGroupSection('mine')">My Groups</button>
+            <button class="chip" onclick="showGroupSection('discover')">Discover</button>
+            <button class="chip" onclick="showGroupSection('invites')">Invitations</button></div>
+
+        <div id="myGroupsList">
+            <div class="empty">You haven't joined any groups yet.</div>
+        </div>
+
+        <div id="discoverGroupsList" class="hidden">
+            <div class="empty">Discover groups coming soon.</div>
+        </div>
+
+        <div id="groupInvitationsList" class="hidden">
+            <div class="empty">You have no pending invitations.</div>
+        </div>
     </section>
     <section id="exploreView" class="hidden">
         <div class="eyebrow">Discover the work</div>
@@ -689,6 +707,27 @@ function navigateFromBottomNav(view) {
     if (['home', 'ideas', 'groups', 'explore', 'profile'].includes(view)) {
         requestInterstitialAtNaturalBreak();
     }
+}
+function showGroupSection(section) {
+    const sections = {
+        mine: 'myGroupsList',
+        discover: 'discoverGroupsList',
+        invites: 'groupInvitationsList'
+    };
+
+    Object.entries(sections).forEach(([key, id]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.classList.toggle('hidden', key !== section);
+        }
+    });
+
+    document.querySelectorAll('#groupFilters .chip').forEach(button => {
+        button.classList.toggle(
+            'active',
+            button.getAttribute('onclick') === `showGroupSection('${section}')`
+        );
+    });
 }
 function navigate(view){
     [
