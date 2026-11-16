@@ -759,8 +759,9 @@ async function createGroup() {
 
         if (error) throw error;
 
-        closeCreateGroup();
-        toast('Group created successfully!');
+        await loadMyGroups();
+closeCreateGroup();
+toast('Group created successfully!');
 
     } catch (error) {
         console.error('ClickVibe: Group creation failed:', error);
@@ -821,6 +822,9 @@ loadProfileAvatar();
     if (view === 'notifications') {
     subscribeNotificationsRealtime();
     loadNotifications();
+}
+if (view === 'groups') {
+    loadMyGroups();
 }
     window.scrollTo({
         top:0,
@@ -955,6 +959,65 @@ profile
     );
     toast('Could not load community posts. Check the connection.');
   }
+}
+async function loadMyGroups() {
+    const client = window.clickVibeSupabase;
+    const container = document.getElementById('myGroupsList');
+
+    if (!client || !container) return;
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            container.innerHTML = '<div class="empty">Please log in to view your groups.</div>';
+            return;
+        }
+
+        const { data: memberships, error: membershipError } = await client
+            .from('group_members')
+            .select('group_id')
+            .eq('user_id', user.id)
+            .eq('status', 'active');
+
+        if (membershipError) throw membershipError;
+
+        const groupIds = (memberships || []).map(m => m.group_id);
+
+        if (groupIds.length === 0) {
+            container.innerHTML = '<div class="empty">You haven\'t joined any groups yet.</div>';
+            return;
+        }
+
+        const { data: groups, error: groupsError } = await client
+            .from('community_groups')
+            .select('*')
+            .in('id', groupIds)
+            .order('created_at', { ascending: false });
+
+        if (groupsError) throw groupsError;
+
+        container.innerHTML = (groups || []).map(group => `
+            <article class="card">
+                <div class="cardtop">
+                    <div>
+                        <div class="author">${escapeHtml(group.name)}</div>
+                        <div class="time">${group.privacy === 'private' ? 'Private group' : 'Public group'}</div>
+                    </div>
+                </div>
+                <p style="margin-top:12px">${escapeHtml(group.description)}</p>
+            </article>
+        `).join('');
+
+    } catch (error) {
+        console.error('ClickVibe: Could not load groups:', error);
+        container.innerHTML = '<div class="empty">Could not load your groups.</div>';
+    }
 }
 function escapeHtml(value) {
     const element = document.createElement('span');
