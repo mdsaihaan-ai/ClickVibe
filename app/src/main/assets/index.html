@@ -416,6 +416,32 @@ flex: 1;
             <div class="empty">You have no pending invitations.</div>
         </div>
     </section>
+    <section id="groupDetailView" class="hidden">
+        <button class="btn small" onclick="navigate('groups')">
+            ← Back to Groups
+        </button>
+
+        <div style="margin-top:24px">
+            <div class="eyebrow" id="groupDetailPrivacy">Public group</div>
+            <h2 id="groupDetailName">Group name</h2>
+            <p class="muted" id="groupDetailDescription">Group description</p>
+        </div>
+
+        <div class="card" style="margin-top:20px">
+            <h3>Members</h3>
+            <div id="groupDetailMembers">
+                Loading members...
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+            <h3>Discussions</h3>
+            <div id="groupDetailDiscussions">
+                Discussions coming soon.
+            </div>
+        </div>
+    </section>
+
     <section id="exploreView" class="hidden">
         <div class="eyebrow">Discover the work</div>
         <div class="sectionhead">
@@ -794,7 +820,8 @@ function navigate(view){
     'home',
     'ideas',
     'groups',
-    'explore',
+'groupDetail',
+'explore',
     'postDetail',
     'profile',
     'create',
@@ -837,8 +864,9 @@ if (view === 'groups') {
     });
 }
 function handleAndroidBack() {
-    const screenOrder = {
+const screenOrder = {
     postDetail: cvPostDetailReturnView || 'home',
+    groupDetail: 'groups',
     create: 'home'
 };
 
@@ -846,7 +874,8 @@ function handleAndroidBack() {
     'home',
     'ideas',
     'groups',
-    'explore',
+'groupDetail',
+'explore',
     'postDetail',
     'notifications',
     'profile',
@@ -1032,6 +1061,44 @@ async function joinGroup(groupId) {
         console.error('ClickVibe: Could not join group:', error);
         toast('Could not join group: ' + error.message);
     }
+}async function openGroupDetail(groupId) {
+    const client = window.clickVibeSupabase;
+
+    if (!client) {
+        toast('Database connection unavailable.');
+        return;
+    }
+
+    try {
+        const { data: group, error } = await client
+            .from('community_groups')
+            .select('*')
+            .eq('id', groupId)
+            .single();
+
+        if (error) throw error;
+
+        document.getElementById('groupDetailName').textContent =
+            group.name;
+
+        document.getElementById('groupDetailDescription').textContent =
+            group.description || 'No description provided.';
+
+        document.getElementById('groupDetailPrivacy').textContent =
+            group.privacy === 'private' ? 'Private group' : 'Public group';
+
+        document.getElementById('groupDetailMembers').textContent =
+            'Member list coming next.';
+
+        document.getElementById('groupDetailDiscussions').textContent =
+            'Discussions coming next.';
+
+        navigate('groupDetail');
+
+    } catch (error) {
+        console.error('ClickVibe: Could not open group:', error);
+        toast('Could not open group: ' + error.message);
+    }
 }
 async function loadDiscoverGroups() {
     const client = window.clickVibeSupabase;
@@ -1082,7 +1149,7 @@ async function loadDiscoverGroups() {
         }
 
         container.innerHTML = availableGroups.map(group => `
-            <article class="card">
+            <article class="card" onclick="openGroupDetail('${group.id}')" style="cursor:pointer">
                 <div class="cardtop">
                     <div>
                         <div class="author">${escapeHtml(group.name)}</div>
@@ -1145,7 +1212,7 @@ async function loadMyGroups() {
         if (groupsError) throw groupsError;
 
         container.innerHTML = (groups || []).map(group => `
-            <article class="card">
+            <article class="card" onclick="openGroupDetail('${group.id}')" style="cursor:pointer">
                 <div class="cardtop">
                     <div>
                         <div class="author">${escapeHtml(group.name)}</div>
