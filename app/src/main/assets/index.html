@@ -427,7 +427,46 @@ margin-top: 8px;
 flex: 1;
 }
 
+/* Fixed reply box on Post Detail */
+#postDetailView:not(.hidden) .comment-section {
+    padding-bottom: 100px;
+}
 
+#postDetailView:not(.hidden) .commentbox {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 68px;
+    z-index: 9;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 12px 16px;
+    background: #111820;
+    border-top: 1px solid #354353;
+    box-shadow: 0 -8px 25px #0008;
+}
+
+#postDetailView:not(.hidden) .commentbox input {
+    flex: 1;
+    width: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 12px;
+}
+
+#postDetailView:not(.hidden) .commentbox .btn {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+@media (min-width: 680px) {
+    #postDetailView:not(.hidden) .commentbox {
+        bottom: 0;
+    }
+}
 </style></head>
 
 <body>
@@ -574,10 +613,6 @@ flex: 1;
 
         <div id="postDetailContent" style="margin-top:16px"></div>
     </section>
-
-
-
-
 
 
     <section id="profileView" class="hidden">
@@ -817,6 +852,7 @@ function closePostDetail() {
     cvCurrentPostDetailId = null;
     navigate(cvPostDetailReturnView || 'home');
 }
+
 function render(){const visible=posts.filter(p=>filter==='All'||p.type===filter);$('feed').innerHTML=visible.length?visible.map(p=>card(p)).join(''):'<div class="empty">Nothing here yet. Start the conversation.</div>';$('ideasList').innerHTML=posts.filter(p=>p.type==='Idea').map(p=>card(p)).join('')||'<div class="empty">No ideas yet. Share the first one.</div>';$('exploreList').innerHTML=posts.filter(p=>p.type!=='Idea').map(p=>card(p)).join('')||'<div class="empty">No projects or work updates to explore yet.</div>';;$('myActivity').innerHTML=posts.filter(p=>p.author===($('profileName')?.value||'Saihaan')).map(p=>card(p,true)).join('')||'<div class="empty">Your activity will appear here.</div>';const mine=posts.filter(p=>p.author==='Saihaan');$('statIdeas').textContent=posts.filter(p=>p.type==='Idea').length;$('statVentures').textContent=posts.filter(p=>p.type==='Venture').length;$('statUpdates').textContent=posts.reduce((n,p)=>n+(p.updateCount||0),0);renderPostDetail();}
 let cvLastInterstitialRequestAt = 0;
 
@@ -939,7 +975,7 @@ function navigate(view){
     'groups',
 'groupDetail',
 'explore',
-    'postDetail',
+        'postDetail',
     'profile',
     'create',
     'notifications'
@@ -1788,12 +1824,9 @@ async function likePost(id) {
   }
 }
 function toggleComments(id, button) {
-  const cardElement = button?.closest('.card');
-  const comments = cardElement?.querySelector('.comment-section');
+    if (button?.closest('#postDetailView')) return;
 
-  if (comments) {
-    comments.classList.toggle('hidden');
-  }
+    openPostDetail(id);
 }
 function reopenComments(postId, containerId) {
   const root = containerId ? $(containerId) : document;
