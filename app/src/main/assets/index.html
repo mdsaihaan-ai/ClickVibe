@@ -106,7 +106,9 @@ button:focus-visible {
 .commentbox .btn{align-self:flex-start}.commentbox input{min-width:0;flex:1;background:#0c1015;border:1px solid #2d3844;border-radius:9px;padding:9px;color:var(--text);font-size:12px}.comment{font-size:11px;color:#a8b3c0;border-top:1px solid #29333e;padding-top:9px;margin-top:9px;line-height:1.6}.toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:#dce4ed;color:#101720;padding:11px 15px;border-radius:11px;font-size:11px;font-weight:800;z-index:20;box-shadow:0 6px 24px #0008;max-width:90%;text-align:center}
 @media(min-width:680px){.main{padding:25px}.hero{padding:29px 28px}.hero h1{font-size:45px}.app{padding-bottom:24px}.bottom{position:static;max-width:760px;margin:0 auto 20px;border:1px solid #293440;border-radius:15px}.fab{bottom:90px}}
 @media(max-width:360px){.main{padding:14px 12px}.hero{padding:20px 16px}.hero h1{font-size:29px}.stat{padding:11px 9px}.stat b{font-size:20px}.card{padding:13px}.top{padding:12px}}
-
+.card {
+    -webkit-tap-highlight-color: transparent;
+}
 #authView {
 min-height: 100vh;
 padding: 24px 18px;
@@ -177,6 +179,95 @@ margin-top: 22px;
 }
 #authMessage {
 overflow-wrap: anywhere;
+}
+#createGroupDialog {
+    width: calc(100% - 36px);
+    max-width: 420px;
+    padding: 26px 22px;
+    border: 1px solid #455363;
+    border-radius: 23px;
+    background:
+        radial-gradient(ellipse at 100% 0%, #283747 0%, transparent 55%),
+        linear-gradient(145deg, #171e27, #0e1218);
+    color: #f1f4f8;
+    box-shadow: 0 24px 80px #000b;
+}
+
+#createGroupDialog::backdrop {
+    background: rgba(3, 6, 10, 0.82);
+    backdrop-filter: blur(7px);
+}
+
+#createGroupDialog h3 {
+    margin: 0 0 8px;
+    font-size: 23px;
+    font-weight: 780;
+    letter-spacing: -0.8px;
+}
+
+#createGroupDialog p {
+    margin: 0 0 23px;
+    color: #9eacbb;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+#createGroupDialog input,
+#createGroupDialog textarea,
+#createGroupDialog select {
+    display: block;
+    width: 100%;
+    margin-bottom: 13px;
+    padding: 14px;
+    border: 1px solid #303d4b;
+    border-radius: 12px;
+    background: #0b1016;
+    color: #edf2f7;
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+}
+
+#createGroupDialog input:focus,
+#createGroupDialog textarea:focus,
+#createGroupDialog select:focus {
+    border-color: #899bad;
+    box-shadow: 0 0 0 3px #aebdcd12;
+}
+
+#createGroupDialog textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+#createGroupDialog input::placeholder,
+#createGroupDialog textarea::placeholder {
+    color: #657383;
+}
+
+#createGroupDialog .delete-dialog-actions {
+    margin-top: 22px;
+    gap: 10px;
+}
+
+#createGroupDialog .delete-dialog-actions button {
+    flex: 1;
+    padding: 12px 10px;
+    border-radius: 11px;
+    font-size: 12px;
+    font-weight: 750;
+}
+
+#createGroupDialog .delete-dialog-confirm {
+    background: linear-gradient(145deg, #e2e8ef, #aebdcd);
+    border: 1px solid #dce4ed;
+    color: #111821;
+}
+
+#createGroupDialog .delete-dialog-cancel {
+    background: #202833;
+    border: 1px solid #354353;
+    color: #cbd5df;
 }
 #deletePostDialog,
 #deleteProfileAvatarDialog,
