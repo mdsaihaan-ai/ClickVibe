@@ -154,7 +154,27 @@ margin-top: 10px;
 #loginForm {
 margin-top: 22px;
 }
+.password-input-wrap {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
 
+.password-input-wrap input {
+    padding-right: 65px;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #aebbc9;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 8px 4px;
+}
 #authMessage {
 overflow-wrap: anywhere;
 }
@@ -342,8 +362,14 @@ flex: 1;
 
             <div class="field">
                 <label>Password</label>
-                <input id="loginPassword" type="password"
-                       autocomplete="current-password" placeholder="Password">
+                <div class="password-input-wrap">
+                    <input id="loginPassword" type="password"
+                           autocomplete="current-password" placeholder="Password">
+                    <button type="button" class="password-toggle"
+                            onclick="togglePasswordVisibility()">
+                        Show
+                    </button>
+                </div>
             </div>
 
             <button class="btn primary" onclick="signInWithEmail()">
@@ -2640,6 +2666,16 @@ async function deleteProfileAvatar() {
 // ===== ClickVibe Authentication =====
 
 let cvAuthMode = "user";
+function togglePasswordVisibility() {
+    const input = document.getElementById("loginPassword");
+    const button = document.querySelector(".password-toggle");
+
+    if (!input || !button) return;
+
+    const isHidden = input.type === "password";
+    input.type = isHidden ? "text" : "password";
+    button.textContent = isHidden ? "Hide" : "Show";
+}
 
 function cvAuthMessage(message) {
   const el = document.getElementById("authMessage");
