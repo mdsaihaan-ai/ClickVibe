@@ -811,6 +811,7 @@ flex: 1;
                     id="groupMessageInput"
                     placeholder="Write a message..."
                     autocomplete="off"
+                    onkeydown="if(event.key === 'Enter') sendGroupMessage()"
             >
 
             <button onclick="sendGroupMessage()">
@@ -1437,6 +1438,154 @@ async function joinGroup(groupId) {
         toast('Could not join group: ' + error.message);
     }
 }
+async function loadGroupMessages(groupId) {
+    const client = window.clickVibeSupabase;
+    const container = document.getElementById('groupMessages');
+
+    if (!client || !container) return;
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+        if (!user) throw new Error('Please log in again.');
+
+        const { data: messages, error: messagesError } = await client
+            .from('group_messages')
+            .select('*')
+            .eq('group_id', groupId)
+            .order('created_at', { ascending: true });
+
+        if (messagesError) throw messagesError;
+
+        if (!messages || messages.length === 0) {
+            container.innerHTML = `
+                <div class="group-chat-empty">
+                    No messages yet. Start the conversation!
+                </div>
+            `;
+            return;
+        }
+
+        const userIds = [...new Set(messages.map(m => m.user_id))];
+
+        const { data: profiles, error: profilesError } = await client
+            .from('member_profiles')
+            .select('user_id, display_name')
+            .in('user_id', userIds);
+
+        if (profilesError) throw profilesError;
+
+        const profileMap = new Map(
+            (profiles || []).map(p => [p.user_id, p.display_name])
+        );
+
+        container.innerHTML = '';
+
+        messages.forEach(message => {
+            const isOwn = message.user_id === user.id;
+            const author = profileMap.get(message.user_id) || 'Member';
+            const time = new Date(message.created_at).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const messageElement = document.createElement('div');
+            messageElement.className =
+                'group-message' + (isOwn ? ' own' : '');
+
+            const authorElement = document.createElement('div');
+            authorElement.className = 'group-message-author';
+            authorElement.textContent = author;
+
+            const bubbleElement = document.createElement('div');
+            bubbleElement.className = 'group-message-bubble';
+            bubbleElement.textContent = message.content;
+
+            const timeElement = document.createElement('div');
+            timeElement.className = 'group-message-time';
+            timeElement.textContent = time;
+
+            messageElement.append(
+                authorElement,
+                bubbleElement,
+                timeElement
+            );
+
+            container.appendChild(messageElement);
+        });
+
+        container.scrollTop = container.scrollHeight;
+
+    } catch (error) {
+        console.error('ClickVibe: Could not load group messages:', error);
+        toast('Could not load messages: ' + error.message);
+    }
+}
+async function sendGroupMessage() {
+    const client = window.clickVibeSupabase;
+    const input = document.getElementById('groupMessageInput');
+    const content = input.value.trim();
+
+    if (!client || !window.currentGroupId || !content) return;
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+        if (!user) throw new Error('Please log in again.');
+
+        const { error } = await client
+            .from('group_messages')
+            .insert({
+                group_id: window.currentGroupId,
+                user_id: user.id,
+                content: content
+            });
+
+        if (error) throw error;
+
+        input.value = '';
+        await loadGroupMessages(window.currentGroupId);
+
+    } catch (error) {
+        console.error('ClickVibe: Could not send message:', error);
+        toast('Could not send message: ' + error.message);
+    }
+}
+function subscribeGroupMessages(groupId) {
+    const client = window.clickVibeSupabase;
+
+    if (!client) return;
+
+    if (window.groupMessagesChannel) {
+        client.removeChannel(window.groupMessagesChannel);
+    }
+
+    window.groupMessagesChannel = client
+        .channel('group-chat-' + groupId)
+        .on(
+            'postgres_changes',
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'group_messages',
+                filter: 'group_id=eq.' + groupId
+            },
+            async () => {
+                if (window.currentGroupId === groupId) {
+                    await loadGroupMessages(groupId);
+                }
+            }
+        )
+        .subscribe();
+}
 async function openGroupDetail(groupId) {
     const client = window.clickVibeSupabase;
 
@@ -1469,13 +1618,15 @@ async function openGroupDetail(groupId) {
         `;
 
         navigate('groupDetail');
+await loadGroupMessages(groupId);
+subscribeGroupMessages(groupId);
 
     } catch (error) {
         console.error('ClickVibe: Could not open group:', error);
         toast('Could not open group: ' + error.message);
     }
 }
-async function loadDiscoverGroups() {
+    async function loadDiscoverGroups() {
     const client = window.clickVibeSupabase;
     const container = document.getElementById('discoverGroupsList');
 
