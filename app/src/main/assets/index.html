@@ -801,6 +801,125 @@ flex: 1;
     color: #8fa1b4;
     font-size: 23px;
 }
+    /* Group invitation dialog */
+#groupInviteDialog.group-invite-dialog {
+    width: min(420px, calc(100% - 36px));
+    padding: 28px;
+    border: 1px solid rgba(200, 209, 220, 0.35);
+    border-radius: 22px;
+    background: #171717;
+    color: #f5f1e8;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+#groupInviteDialog::backdrop {
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(5px);
+}
+
+.group-invite-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+}
+
+.group-invite-icon {
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    background: rgba(200, 209, 220, 0.13);
+    color: #c8d1dc;
+    font-size: 23px;
+}
+
+.group-invite-close {
+    border: 0;
+    background: transparent;
+    color: #999;
+    font-size: 27px;
+    cursor: pointer;
+}
+
+#groupInviteDialog h3 {
+    margin: 0 0 9px;
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.group-invite-description {
+    margin: 0 0 25px;
+    color: #aaa;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+#groupInviteDialog label {
+    display: block;
+    margin-bottom: 9px;
+    color: #c8d1dc;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+}
+
+#groupInviteUsername {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid #393939;
+    border-radius: 12px;
+    outline: none;
+    background: #222;
+    color: #fff;
+    font-size: 15px;
+}
+
+#groupInviteUsername:focus {
+    border-color: #c8d1dc;
+    box-shadow: 0 0 0 3px rgba(200, 209, 220, 0.12);
+}
+
+#groupInviteUsername::placeholder {
+    color: #777;
+}
+
+.group-invite-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.group-invite-actions button {
+    min-height: 46px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.group-invite-cancel {
+    flex: 1;
+    border: 1px solid #393939;
+    background: transparent;
+    color: #bbb;
+}
+
+.group-invite-send {
+    flex: 1.5;
+    border: 0;
+    background: #c8d1dc;
+    color: #171717;
+}
+
+.group-invite-send span {
+    margin-left: 5px;
+    font-size: 17px;
+}
 </style></head>
 
 <body>
@@ -1297,6 +1416,11 @@ toast('Group created successfully!');
         toast('Could not create group: ' + error.message);
     }
 }
+function openGroupInvitationsFromNotification() {
+    navigate('groups');
+    showGroupSection('invites');
+    loadGroupInvitations();
+}
 function showGroupSection(section) {
     const sections = {
         mine: 'myGroupsList',
@@ -1317,6 +1441,9 @@ function showGroupSection(section) {
             button.getAttribute('onclick') === `showGroupSection('${section}')`
         );
     });
+if (section === 'invites') {
+    loadGroupInvitations();
+}
 }
 function navigate(view){
     [
@@ -2053,6 +2180,121 @@ function escapeHtml(value) {
     element.textContent = String(value ?? '');
     return element.innerHTML;
 }
+async function loadGroupInvitations() {
+    const client = window.clickVibeSupabase;
+    const container = document.getElementById('groupInvitationsList');
+
+    if (!client || !container) return;
+
+    container.innerHTML = '<div class="empty">Loading invitations...</div>';
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            container.innerHTML =
+                '<div class="empty">Sign in to view invitations.</div>';
+            return;
+        }
+
+        const { data: invitations, error } = await client
+            .from('group_invitations')
+            .select('id, group_id, inviter_id, created_at')
+            .eq('invitee_id', user.id)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!invitations || invitations.length === 0) {
+            container.innerHTML =
+                '<div class="empty">You have no pending invitations.</div>';
+            return;
+        }
+
+        const groupIds = [...new Set(invitations.map(i => i.group_id))];
+        const inviterIds = [...new Set(invitations.map(i => i.inviter_id))];
+
+        const { data: groups, error: groupsError } = await client
+            .from('community_groups')
+            .select('id, name, privacy')
+            .in('id', groupIds);
+
+        if (groupsError) throw groupsError;
+
+        const { data: profiles, error: profilesError } = await client
+            .from('member_profiles')
+            .select('user_id, display_name')
+            .in('user_id', inviterIds);
+
+        if (profilesError) throw profilesError;
+
+        container.innerHTML = invitations.map(invitation => {
+            const group = groups?.find(g => g.id === invitation.group_id);
+            const inviter = profiles?.find(p => p.user_id === invitation.inviter_id);
+
+            return `
+                <article class="card">
+                    <div class="author">${escapeHtml(group?.name || 'Unknown group')}</div>
+                    <div class="time">
+                        Invited by ${escapeHtml(inviter?.display_name || 'Unknown user')}
+                        · ${group?.privacy === 'private' ? 'Private group' : 'Public group'}
+                    </div>
+                    <div class="actions">
+                        <button class="btn primary small"
+                            onclick="respondToGroupInvitation('${invitation.id}', 'accepted')">
+                            Accept
+                        </button>
+                        <button class="btn small"
+                            onclick="respondToGroupInvitation('${invitation.id}', 'declined')">
+                            Decline
+                        </button>
+                    </div>
+                </article>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Could not load group invitations:', error);
+        container.innerHTML =
+            '<div class="empty">Could not load invitations.</div>';
+    }
+}
+async function respondToGroupInvitation(invitationId, response) {
+    const client = window.clickVibeSupabase;
+
+    if (!client) return;
+
+    try {
+        const { data, error } = await client.rpc(
+            'respond_to_group_invitation',
+            {
+                p_invitation_id: invitationId,
+                p_response: response
+            }
+        );
+
+        if (error) throw error;
+
+        if (response === 'accepted') {
+            toast('Invitation accepted! You joined the group.');
+            await loadMyGroups();
+        } else {
+            toast('Invitation declined.');
+        }
+
+        await loadGroupInvitations();
+
+    } catch (error) {
+        console.error('Could not respond to invitation:', error);
+        toast(error.message || 'Could not respond to invitation.');
+    }
+}
 async function loadNotifications() {
     const client = window.clickVibeSupabase;
     const container = $('notificationsList');
@@ -2078,8 +2320,8 @@ async function loadNotifications() {
         const { data, error } = await client
     .from('app_notifications')
     .select(
-        'id, notification_type, message, post_id, is_read, created_at'
-    )
+    'id, notification_type, message, post_id, invitation_id, is_read, created_at'
+)
     .order('created_at', { ascending: false });
 
 if (error) throw error;
@@ -2106,7 +2348,8 @@ if (unreadIds.length > 0) {
         container.innerHTML = data.map(notification => {
             const icon = {
     like: '♥',
-    comment: '▤'
+    comment: '▤',
+    group_invitation: '✉'
 }[notification.notification_type] || '•';
 
             const date = new Date(
@@ -2115,10 +2358,11 @@ if (unreadIds.length > 0) {
             const displayMessage = notification.message;
 
             return `
-                <article
-                    class="card"
-                    style="${notification.is_read ? 'opacity:0.75;' : 'border-color:var(--gold,#c9a45c);'}"
-                >
+    <article
+        class="card"
+        style="${notification.is_read ? 'opacity:0.75;' : 'border-color:var(--gold,#c8d1dc);'}"
+        onclick="${notification.notification_type === 'group_invitation' ? "openGroupInvitationsFromNotification()" : ''}"
+    >
                     <div class="cardtop">
                         <div class="avatar">${icon}</div>
                         <div>
@@ -3923,30 +4167,36 @@ cvInitAuth();
         <span class="group-settings-arrow">›</span>
     </button>
 </dialog>
-<dialog id="groupInviteDialog">
-    <h3>Invite a member</h3>
-    <p>Enter their ClickVibe username.</p>
+<dialog id="groupInviteDialog" class="group-invite-dialog">
+    <div class="group-invite-header">
+        <div class="group-invite-icon">✦</div>
+        <button type="button" class="group-invite-close"
+                onclick="document.getElementById('groupInviteDialog').close()">
+            ×
+        </button>
+    </div>
 
+    <h3>Bring someone in.</h3>
+    <p class="group-invite-description">
+        Invite someone to join the conversation and build something together.
+    </p>
+
+    <label for="groupInviteUsername">CLICKVIBE USERNAME</label>
     <input
             type="text"
             id="groupInviteUsername"
-            placeholder="Enter username"
+            placeholder="Enter their username"
             maxlength="30"
             autocomplete="off">
 
-    <div class="delete-dialog-actions">
-        <button
-                type="button"
-                class="delete-dialog-cancel"
+    <div class="group-invite-actions">
+        <button type="button" class="group-invite-cancel"
                 onclick="document.getElementById('groupInviteDialog').close()">
             Cancel
         </button>
-
-        <button
-                type="button"
-                class="delete-dialog-confirm"
+        <button type="button" class="group-invite-send"
                 onclick="sendGroupInvitation()">
-            Send invite
+            Send invitation <span>→</span>
         </button>
     </div>
 </dialog>
