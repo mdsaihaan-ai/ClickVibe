@@ -1795,6 +1795,131 @@ if (inviteButton) {
         toast('Group settings error: ' + (error.message || 'Unknown error'));
     }
 }
+function openGroupInviteDialog() {
+    const input = document.getElementById('groupInviteUsername');
+
+    if (input) {
+        input.value = '';
+    }
+
+    document.getElementById('groupInviteDialog').showModal();
+}
+async function sendGroupInvitation() {
+    const client = window.clickVibeSupabase;
+    const input = document.getElementById('groupInviteUsername');
+    const username = input.value.trim();
+    const groupId = window.currentGroupId;
+
+    if (!client || !groupId) {
+        toast('Could not connect to this group.');
+        return;
+    }
+
+    if (!username) {
+        toast('Enter a username first.');
+        return;
+    }
+
+    try {
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+
+        if (!user) {
+            toast('Please sign in again.');
+            return;
+        }
+
+        // Find the account by username.
+        const { data: profile, error: profileError } = await client
+            .from('member_profiles')
+            .select('user_id, display_name')
+            .ilike('display_name', username)
+            .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        if (!profile) {
+            toast('No user found with that username.');
+            return;
+        }
+
+        if (profile.user_id === user.id) {
+            toast('You cannot invite yourself.');
+            return;
+        }
+        const { data: allowed, error: permissionError } = await client.rpc(
+    'can_send_group_invitation',
+    {
+        p_group_id: groupId,
+        p_invitee_id: profile.user_id
+    }
+);
+
+console.log('Invitation permission check:', {
+    groupId,
+    inviterId: user.id,
+    inviteeId: profile.user_id,
+    allowed,
+    permissionError
+});
+
+if (permissionError) throw permissionError;
+
+if (!allowed) {
+    toast('Database permission check returned false.');
+    return;
+}
+
+        // Create the invitation.
+        const { data: invitation, error: inviteError } = await client
+            .from('group_invitations')
+            .insert({
+                group_id: groupId,
+                inviter_id: user.id,
+                invitee_id: profile.user_id,
+                status: 'pending'
+            })
+            .select('id')
+            .single();
+
+        if (inviteError) {
+            if (inviteError.code === '23505') {
+                toast('This user already has a pending invitation.');
+                return;
+            }
+
+            throw inviteError;
+        }
+
+        // Create the in-app notification.
+        const { error: notificationError } = await client
+            .from('app_notifications')
+            .insert({
+                recipient_id: profile.user_id,
+                actor_id: user.id,
+                notification_type: 'group_invitation',
+                invitation_id: invitation.id,
+                message: 'You have been invited to join a group.'
+            });
+
+        if (notificationError) {
+            console.error('Invitation notification failed:', notificationError);
+            toast('Invite sent, but notification could not be created.');
+        } else {
+            toast('Invitation sent!');
+        }
+
+        document.getElementById('groupInviteDialog').close();
+
+    } catch (error) {
+        console.error('Group invitation failed:', error);
+        toast('Could not send invitation: ' + error.message);
+    }
+}
     async function loadDiscoverGroups() {
     const client = window.clickVibeSupabase;
     const container = document.getElementById('discoverGroupsList');
