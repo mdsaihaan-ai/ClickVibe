@@ -674,6 +674,133 @@ flex: 1;
         padding: 12px 25px;
     }
 }
+    /* GROUP SETTINGS */
+#groupSettingsDialog {
+    width: calc(100% - 40px);
+    max-width: 380px;
+    padding: 24px;
+    border: 1px solid #303b49;
+    border-radius: 20px;
+    background: #111820;
+    color: #edf2f7;
+    box-shadow: 0 24px 70px #000b;
+}
+
+#groupSettingsDialog::backdrop {
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(5px);
+}
+
+.group-settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+}
+
+.group-settings-eyebrow,
+.group-settings-section-label {
+    color: #91a3b7;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+}
+
+.group-settings-header h3 {
+    margin: 7px 0 0;
+    font-size: 21px;
+    font-weight: 750;
+}
+
+.group-settings-close {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #344252;
+    border-radius: 10px;
+    background: #202a35;
+    color: #cbd5df;
+}
+
+.group-settings-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid #2b3948;
+    border-radius: 15px;
+    background: #19232e;
+    margin-bottom: 25px;
+}
+
+.group-settings-icon {
+    display: grid;
+    place-items: center;
+    width: 43px;
+    height: 43px;
+    flex-shrink: 0;
+    border-radius: 13px;
+    background: #29394a;
+    color: #d5e0ec;
+    font-size: 22px;
+}
+
+.group-settings-title {
+    font-size: 15px;
+    font-weight: 750;
+    overflow-wrap: anywhere;
+}
+
+.group-settings-subtitle {
+    margin-top: 5px;
+    color: #94a4b5;
+    font-size: 12px;
+}
+
+.group-settings-section-label {
+    margin-bottom: 10px;
+}
+
+.group-settings-action {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 13px;
+    padding: 14px;
+    border: 1px solid #2d3b49;
+    border-radius: 13px;
+    background: #19232e;
+    color: #edf2f7;
+    text-align: left;
+}
+
+.group-settings-action-icon {
+    display: grid;
+    place-items: center;
+    width: 35px;
+    height: 35px;
+    border-radius: 10px;
+    background: #29394a;
+    color: #dce7f2;
+    font-size: 22px;
+}
+
+.group-settings-action strong {
+    display: block;
+    font-size: 13px;
+}
+
+.group-settings-action small {
+    display: block;
+    margin-top: 4px;
+    color: #91a0b0;
+    font-size: 11px;
+}
+
+.group-settings-arrow {
+    margin-left: auto;
+    color: #8fa1b4;
+    font-size: 23px;
+}
 </style></head>
 
 <body>
@@ -1624,6 +1751,48 @@ subscribeGroupMessages(groupId);
     } catch (error) {
         console.error('ClickVibe: Could not open group:', error);
         toast('Could not open group: ' + error.message);
+    }
+}
+async function openGroupSettings() {
+    const client = window.clickVibeSupabase;
+    const groupId = window.currentGroupId;
+
+    if (!client || !groupId) return;
+
+    try {
+        const { data: group, error } = await client
+            .from('community_groups')
+            .select('name, privacy, created_by')
+            .eq('id', groupId)
+            .single();
+
+        if (error) throw error;
+
+        const { data: sessionData } = await client.auth.getSession();
+        const user = sessionData.session?.user;
+
+        document.getElementById('groupSettingsName').textContent =
+            group.name;
+
+        document.getElementById('groupSettingsPrivacy').textContent =
+            group.privacy === 'private' ? 'Private group' : 'Public group';
+
+        const inviteButton = document.querySelector(
+    '#groupSettingsDialog .group-settings-action'
+);
+
+if (inviteButton) {
+    inviteButton.style.display =
+        group.privacy === 'public' || group.created_by === user?.id
+            ? ''
+            : 'none';
+}
+
+        document.getElementById('groupSettingsDialog').showModal();
+
+    } catch (error) {
+        console.error('ClickVibe: Could not load group settings:', error);
+        toast('Group settings error: ' + (error.message || 'Unknown error'));
     }
 }
     async function loadDiscoverGroups() {
@@ -3594,6 +3763,65 @@ cvInitAuth();
         <button type="button" class="delete-dialog-confirm"
                 onclick="createGroup()">
             Create group
+        </button>
+    </div>
+</dialog>
+<dialog id="groupSettingsDialog" class="group-settings-dialog">
+    <div class="group-settings-header">
+        <div>
+            <div class="group-settings-eyebrow">GROUP MANAGEMENT</div>
+            <h3>Group settings</h3>
+        </div>
+        <button class="group-settings-close"
+                onclick="document.getElementById('groupSettingsDialog').close()">
+            ✕
+        </button>
+    </div>
+
+    <div class="group-settings-info">
+        <div class="group-settings-icon">✦</div>
+        <div>
+            <div id="groupSettingsName" class="group-settings-title"></div>
+            <div id="groupSettingsPrivacy" class="group-settings-subtitle"></div>
+        </div>
+    </div>
+
+    <div class="group-settings-section-label">MEMBERS</div>
+
+    <button class="group-settings-action"
+            onclick="openGroupInviteDialog()">
+        <span class="group-settings-action-icon">＋</span>
+        <span>
+            <strong>Invite member</strong>
+            <small>Bring someone into this group</small>
+        </span>
+        <span class="group-settings-arrow">›</span>
+    </button>
+</dialog>
+<dialog id="groupInviteDialog">
+    <h3>Invite a member</h3>
+    <p>Enter their ClickVibe username.</p>
+
+    <input
+            type="text"
+            id="groupInviteUsername"
+            placeholder="Enter username"
+            maxlength="30"
+            autocomplete="off">
+
+    <div class="delete-dialog-actions">
+        <button
+                type="button"
+                class="delete-dialog-cancel"
+                onclick="document.getElementById('groupInviteDialog').close()">
+            Cancel
+        </button>
+
+        <button
+                type="button"
+                class="delete-dialog-confirm"
+                onclick="sendGroupInvitation()">
+            Send invite
         </button>
     </div>
 </dialog>
